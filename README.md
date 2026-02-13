@@ -36,7 +36,6 @@ After=network.target
 
 [Service]
 Type=simple
-User=migration-scheduler
 WorkingDirectory=/opt/scheduler
 ExecStart=/opt/scheduler/migration-scheduler server
 Restart=always
