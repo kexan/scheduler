@@ -3,106 +3,113 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Планировщик миграций</title>
+    <title>Планировщик миграций компаний</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <style>
-        .slot-available {
-            background-color: #d4edda;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        .slot-available:hover {
-            background-color: #c3e6cb;
-        }
-        .slot-booked {
-            background-color: #f8d7da;
-            cursor: not-allowed;
-        }
-        .admin-controls {
-            display: none;
-            margin-bottom: 20px;
-            padding: 20px;
-            background-color: #f8f9fa;
-            border-radius: 8px;
-        }
-        .admin-controls.show {
-            display: block;
-        }
-        .booking-info {
-            font-size: 0.9em;
-            color: #6c757d;
-        }
-        .time-slot {
-            border: 1px solid #dee2e6;
-            border-radius: 4px;
-            padding: 10px;
-            margin-bottom: 5px;
-        }
-        .modal-body .form-group {
-            margin-bottom: 15px;
-        }
-    </style>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="css/base.css">
+    <link rel="stylesheet" href="css/layout.css">
+    <link rel="stylesheet" href="css/calendar.css">
+    <link rel="stylesheet" href="css/forms.css">
+    <link rel="stylesheet" href="css/components.css">
 </head>
 <body>
-    <div class="container mt-4">
-        <header class="mb-4">
-            <h1 class="text-center">📅 Планировщик миграций компаний</h1>
-            <div class="text-center">
-                <button id="adminToggle" class="btn btn-outline-primary btn-sm">🔧 Режим администратора</button>
-            </div>
-        </header>
-
-        <!-- Панель администратора -->
-        <div id="adminPanel" class="admin-controls">
-            <h3>🔧 Панель администратора</h3>
-            <button class="btn btn-primary mb-3" data-bs-toggle="modal" data-bs-target="#createSlotModal">
-                ➕ Создать новый слот
-            </button>
-            <div id="adminSlotsList"></div>
-        </div>
-
-        <!-- Основная таблица слотов -->
-        <div class="row">
-            <div class="col-12">
-                <h3>📋 Доступные слоты для записи</h3>
-                <div id="slotsContainer" class="row">
-                    <!-- Слоты будут загружены через JavaScript -->
+    <header>
+        <div class="container">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1>📅 Планировщик миграций компаний</h1>
+                <div class="d-flex gap-2">
+                    <button id="reglamentBtn" class="btn btn-outline-info btn-sm">📋 Регламент миграции</button>
+                    <button id="adminToggle" class="btn btn-outline-secondary btn-sm">🗝️</button>
                 </div>
             </div>
         </div>
-    </div>
+    </header>
 
-    <!-- Модальное окно создания слота -->
-    <div class="modal fade" id="createSlotModal" tabindex="-1">
+
+    <div class="modal fade" id="adminAuthModal" data-bs-backdrop="static">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">Создать новый слот</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    <h5 class="modal-title">🔐 Авторизация администратора</h5>
                 </div>
                 <div class="modal-body">
-                    <form id="createSlotForm">
-                        <div class="form-group">
-                            <label for="slotDate">Дата</label>
-                            <input type="date" class="form-control" id="slotDate" required>
+                    <form id="adminAuthForm">
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Пароль администратора:</label>
+                            <input type="password" class="form-control" id="password" required>
+                            <div class="form-text">Введите пароль для доступа к админским функциям</div>
                         </div>
-                        <div class="form-group">
-                            <label for="slotStartTime">Время начала</label>
-                            <input type="time" class="form-control" id="slotStartTime" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="slotEndTime">Время окончания</label>
-                            <input type="time" class="form-control" id="slotEndTime" required>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Создать слот</button>
+                        <button type="submit" class="btn btn-primary w-100">Войти</button>
                     </form>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Модальное окно бронирования -->
-    <div class="modal fade" id="bookingModal" tabindex="-1">
+
+    <div class="alert alert-info alert-dismissible fade show timezone-alert" role="alert">
+        <div class="container">
+            <i class="bi bi-info-circle-fill me-2"></i>
+            <strong>Внимание!</strong> Все время указано в часовом поясе МСК (UTC+3). 
+            <small class="text-muted">Текущее время МСК: <span id="currentTimeMSK"></span></small>
+        </div>
+    </div>
+
+    <div class="container">
+
+        <div class="row">
+            <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3>📅 Календарь слотов</h3>
+                    <div class="d-flex gap-2 align-items-center">
+                        <button id="prevMonth" class="btn btn-outline-primary">◀</button>
+                        <span id="currentMonth" class="fw-bold align-self-center"></span>
+                        <button id="nextMonth" class="btn btn-outline-primary">▶</button>
+                    </div>
+                </div>
+                
+
+                <div class="d-flex gap-2 mb-3" id="adminControls" style="display: none;">
+                    <button id="toggleCopyPanel" class="btn btn-outline-info btn-sm">
+                        📋 Копирование расписания
+                    </button>
+                    <button id="yougileSettingsBtn" class="btn btn-outline-warning btn-sm">
+                        🔧 Настройки Yougile
+                    </button>
+                </div>
+                
+                <div id="adminCopyPanel" class="admin-copy-panel mb-3" style="display: none;">
+                    <div class="card">
+                        <div class="card-body">
+                            <h6 class="card-title">📋 Копирование расписания</h6>
+                            <div class="row align-items-end">
+                                <div class="col-md-4">
+                                    <label class="form-label small">Дата-источник:</label>
+                                    <input type="date" id="sourceDate" class="form-control form-control-sm">
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="small text-muted mb-2">Выберите дни для копирования:</div>
+                                    <div id="selectedDaysInfo" class="small">Дни не выбраны</div>
+                                </div>
+                                <div class="col-md-4">
+                                    <button id="copySchedule" class="btn btn-success btn-sm" disabled>
+                                        📋 Скопировать расписание
+                                    </button>
+                                    <button id="clearSelection" class="btn btn-outline-secondary btn-sm ms-2">
+                                        ✖️ Сбросить
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div id="calendarContainer">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="bookingModal">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -110,21 +117,24 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <div id="slotInfo" class="alert alert-info mb-3" style="display: none;">
+                        <strong>Выбранный слот:</strong> <span id="slotDateTime"></span>
+                    </div>
                     <form id="bookingForm">
-                        <div class="form-group">
-                            <label for="companyName">Название компании</label>
+                        <div class="mb-3">
+                            <label for="companyName" class="form-label">Название компании</label>
                             <input type="text" class="form-control" id="companyName" required>
                         </div>
-                        <div class="form-group">
-                            <label for="adminEmail">Почта администратора компании в облаке</label>
+                        <div class="mb-3">
+                            <label for="adminEmail" class="form-label">Почта администратора компании в облаке</label>
                             <input type="email" class="form-control" id="adminEmail" required>
                         </div>
-                        <div class="form-group">
-                            <label for="companyId">ID компании (Ctrl+Alt+Q)</label>
+                        <div class="mb-3">
+                            <label for="companyId" class="form-label">ID компании</label>
                             <input type="text" class="form-control" id="companyId" required>
                         </div>
-                        <div class="form-group">
-                            <label for="downloadEmail">Почта для скачивания</label>
+                        <div class="mb-3">
+                            <label for="downloadEmail" class="form-label">Почта для скачивания</label>
                             <input type="email" class="form-control" id="downloadEmail" required>
                         </div>
                         <button type="submit" class="btn btn-success">Записаться</button>
@@ -134,8 +144,7 @@
         </div>
     </div>
 
-    <!-- Модальное окно редактирования слота -->
-    <div class="modal fade" id="editSlotModal" tabindex="-1">
+    <div class="modal fade" id="editSlotModal">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -143,28 +152,236 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <div class="mb-3">
+                        <strong>ID слота:</strong> <span id="editSlotIdDisplay"></span>
+                    </div>
                     <form id="editSlotForm">
                         <input type="hidden" id="editSlotId">
-                        <div class="form-group">
-                            <label for="editSlotDate">Дата</label>
+                        <div class="mb-3">
+                            <label for="editSlotDate" class="form-label">Дата</label>
                             <input type="date" class="form-control" id="editSlotDate" required>
                         </div>
-                        <div class="form-group">
-                            <label for="editSlotStartTime">Время начала</label>
+                        <div class="mb-3">
+                            <label for="editSlotStartTime" class="form-label">Время начала</label>
                             <input type="time" class="form-control" id="editSlotStartTime" required>
                         </div>
-                        <div class="form-group">
-                            <label for="editSlotEndTime">Время окончания</label>
+                        <div class="mb-3">
+                            <label for="editSlotEndTime" class="form-label">Время окончания</label>
                             <input type="time" class="form-control" id="editSlotEndTime" required>
                         </div>
-                        <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                        <div class="mb-3">
+                            <label for="editCompanyName" class="form-label">Название компании</label>
+                            <input type="text" class="form-control" id="editCompanyName">
+                        </div>
+                        <div class="mb-3">
+                            <label for="editAdminEmail" class="form-label">Почта администратора компании</label>
+                            <input type="email" class="form-control" id="editAdminEmail">
+                        </div>
+                        <div class="mb-3">
+                            <label for="editCompanyId" class="form-label">ID компании</label>
+                            <input type="text" class="form-control" id="editCompanyId">
+                        </div>
+                        <div class="mb-3">
+                            <label for="editDownloadEmail" class="form-label">Почта для скачивания</label>
+                            <input type="email" class="form-control" id="editDownloadEmail">
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Сохранить изменения</button>
+                            <button type="button" class="btn btn-danger" onclick="scheduler.modals.deleteSlot()">Удалить слот</button>
+                        </div>
                     </form>
                 </div>
             </div>
         </div>
     </div>
 
+    <div class="modal fade" id="quickSlotModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Создать слот</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="quickSlotForm">
+                        <input type="hidden" id="quickSlotDate">
+                        <div class="mb-3">
+                            <label class="form-label">Дата</label>
+                            <input type="text" class="form-control" id="quickSlotDateDisplay" readonly>
+                        </div>
+                        <div class="mb-3">
+                            <label for="quickSlotStartTime" class="form-label">Время начала</label>
+                            <input type="time" class="form-control" id="quickSlotStartTime" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="quickSlotEndTime" class="form-label">Время окончания</label>
+                            <input type="time" class="form-control" id="quickSlotEndTime" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Создать слот</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="viewSlotModal">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Информация о слоте</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="slotDetails">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="reglamentModal">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">📋 Регламент планирования миграций из облака в коробку</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <strong>Важно:</strong> Нельзя запланировать миграцию день в день. Планируйте заранее!
+                    </div>
+                    
+                    <h6>Чтобы запланировать миграцию, необходимо написать в чате Bitrix, YouGile тестинг или через почту inf@yougile.com и предоставить следующую информацию:</h6>
+                    <ul>
+                        <li>Название компании</li>
+                        <li>Почта администратора компании в облаке</li>
+                        <li>ID компании (можно получить, нажав Ctrl+Alt+Q, находясь в компании в облаке)</li>
+                        <li>Почта, на которую отправить ссылку для скачивания</li>
+                    </ul>
+
+                    <h6>Важные требования перед миграцией:</h6>
+                    <ul>
+                        <li>Перед началом миграции у клиента должна быть развернута и полностью настроена коробочная версия YouGile</li>
+                        <li>Во время миграции пользователи не должны вносить никаких изменений в компанию</li>
+                        <li>Если нужно мигрировать несколько компаний — необходимо предоставить ID каждой из них</li>
+                    </ul>
+
+                    <h6>Время миграции:</h6>
+                    <ul>
+                        <li>Обычно миграция занимает до 1 часа</li>
+                        <li>Время может быть увеличено, если в компании много пользовательских файлов</li>
+                    </ul>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Закрыть</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="copyScheduleModal">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">📋 Подтверждение копирования расписания</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <strong>Источник:</strong> <span id="copySourceDate"></span><br>
+                        <strong>Слоты для копирования:</strong> <span id="copySourceSlots"></span>
+                    </div>
+                    
+                    <h6>Дни назначения:</h6>
+                    <div id="copyTargetDates"></div>
+                    
+                    <div class="alert alert-warning mt-3">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <strong>Внимание!</strong> Существующие слоты в целевых датах будут заменены.
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-success" id="confirmCopy">Подтвердить копирование</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="yougileSettingsModal">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">🔧 Настройки Yougile интеграции</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="yougileSettingsForm">
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="yougileEnabled">
+                                <label class="form-check-label" for="yougileEnabled">
+                                    Включить интеграцию с Yougile
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="yougileApiUrl" class="form-label">API URL</label>
+                            <input type="url" class="form-control" id="yougileApiUrl" value="https://api.yougile.com">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="yougileApiToken" class="form-label">API Token</label>
+                            <input type="password" class="form-control" id="yougileApiToken" placeholder="Введите токен Yougile">
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="yougileProjectId" class="form-label">Проект</label>
+                            <select class="form-select" id="yougileProjectId" disabled>
+                                <option value="">Сначала проверьте подключение</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="yougileBoardId" class="form-label">Доска</label>
+                            <select class="form-select" id="yougileBoardId" disabled>
+                                <option value="">Сначала выберите проект</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="yougileColumnId" class="form-label">Колонка</label>
+                            <select class="form-select" id="yougileColumnId" disabled>
+                                <option value="">Сначала выберите доску</option>
+                            </select>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <button type="button" class="btn btn-outline-primary" id="testYougileConnection">
+                                🧪 Проверить подключение
+                            </button>
+                            <div id="connectionResult" class="mt-2"></div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Отмена</button>
+                    <button type="button" class="btn btn-primary" id="saveYougileSettings">Сохранить настройки</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="app.js"></script>
+    
+    <script src="js/utils.js"></script>
+    <script src="js/api.js"></script>
+    <script src="js/calendar.js"></script>
+    <script src="js/modals.js"></script>
+    <script src="js/main.js"></script>
 </body>
 </html>

@@ -1,0 +1,142 @@
+/* Базовые стили и переменные */
+:root {
+    --primary-color: #343a40;
+    --secondary-color: #6c757d;
+    --success-color: #28a745;
+    --danger-color: #dc3545;
+    --warning-color: #ffc107;
+    --info-color: #17a2b8;
+    --light-color: #f8f9fa;
+    --dark-color: #343a40;
+    
+    --calendar-gap: 1px;
+    --calendar-border: #dee2e6;
+    --calendar-radius: 8px;
+    
+    --slot-available-bg: #d4edda;
+    --slot-available-hover: #c3e6cb;
+    --slot-booked-bg: #f8d7da;
+    --slot-past-available-bg: #e9ecef;
+    --slot-past-available-hover: #dee2e6;
+    --slot-more-bg: #fff3cd;
+    --slot-more-hover: #ffeaa7;
+    --slot-admin-bg: #cce5ff;
+    --slot-admin-hover: #99d6ff;
+    
+    --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    --body-bg: #f5f5f5;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    background-color: var(--body-bg);
+    font-family: var(--font-family);
+    line-height: 1.6;
+    color: var(--dark-color);
+}
+
+/* Стили для предупреждения о часовом поясе */
+.timezone-alert {
+    border-radius: 0;
+    margin-top: -1rem;
+    margin-bottom: 0.5rem;
+    border-left: none;
+    border-right: none;
+    padding: 0.35rem 0;
+    font-size: 0.8rem;
+}
+
+.timezone-alert .container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+}
+
+.timezone-alert small {
+    font-style: italic;
+    opacity: 0.8;
+}
+
+/* Стили для админ панели копирования */
+.admin-copy-panel {
+    background-color: #f8f9fa;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+.admin-copy-panel .card {
+    border: 1px solid #dee2e6;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.day-checkbox {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    z-index: 10;
+    background: white;
+    border-radius: 3px;
+    padding: 2px;
+    cursor: pointer;
+}
+
+.day-checkbox input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.calendar-day.has-checkbox {
+    position: relative;
+}
+
+.calendar-day.has-checkbox .calendar-day-number {
+    margin-right: 25px;
+}
+
+.calendar-day.selected-for-copy {
+    border: 2px solid #007bff;
+    background-color: #e7f3ff;
+}
+
+#selectedDaysInfo {
+    min-height: 20px;
+    font-weight: 500;
+}
+
+#selectedDaysInfo.has-selection {
+    color: #007bff;
+}
+
+/* Анимация трясения для неверного пароля */
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+    20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+.shake {
+    animation: shake 0.5s ease-in-out;
+}
+
+/* Ensure adminControls is hidden by default */
+#adminControls {
+    display: none !important;
+}
+
+#adminControls.show {
+    display: flex !important;
+}
+
+/* Also hide by default for good measure */
+.d-flex#adminControls {
+    display: none !important;
+}
+
+.d-flex#adminControls.show {
+    display: flex !important;
+}

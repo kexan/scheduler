@@ -13,3 +13,6 @@ devenv.local.yaml
 # Added by cargo
 
 /target
+data
+yougile_settings.json
+yougile_settings.json

@@ -1,0 +1,127 @@
+/* Стили для слотов и информации о бронировании */
+.time-slot {
+    border: 1px solid var(--calendar-border);
+    border-radius: 4px;
+    padding: 10px;
+    margin-bottom: 5px;
+    transition: box-shadow 0.2s ease;
+}
+
+.time-slot:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.booking-info {
+    font-size: 0.9em;
+    color: var(--secondary-color);
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid #eee;
+}
+
+.slot-available {
+    background-color: var(--slot-available-bg);
+    border-color: var(--success-color);
+}
+
+.slot-booked {
+    background-color: var(--slot-booked-bg);
+    border-color: var(--danger-color);
+}
+
+.slot-past-available {
+    background-color: var(--slot-past-available-bg);
+    border-color: var(--secondary-color);
+}
+
+.badge {
+    display: inline-block;
+    padding: 0.25em 0.4em;
+    font-size: 75%;
+    font-weight: 700;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+    vertical-align: baseline;
+    border-radius: 0.25rem;
+}
+
+.bg-success {
+    background-color: var(--success-color) !important;
+}
+
+.bg-danger {
+    background-color: var(--danger-color) !important;
+}
+
+.bg-info {
+    background-color: var(--info-color) !important;
+}
+
+.alert {
+    position: relative;
+    padding: 0.75rem 1.25rem;
+    margin-bottom: 1rem;
+    border: 1px solid transparent;
+    border-radius: 0.25rem;
+}
+
+.alert-info {
+    color: #0c5460;
+    background-color: #d1ecf1;
+    border-color: #bee5eb;
+}
+
+.alert-success {
+    color: #155724;
+    background-color: #d4edda;
+    border-color: #c3e6cb;
+}
+
+.alert-danger {
+    color: #721c24;
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+}
+
+.alert-dismissible {
+    padding-right: 4rem;
+}
+
+.alert-dismissible .btn-close {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 2;
+    padding: 0.75rem 1.25rem;
+}
+
+.position-fixed {
+    position: fixed !important;
+}
+
+.modal-lg {
+    max-width: 800px;
+}
+
+.container-fluid {
+    width: 100%;
+    padding-right: 15px;
+    padding-left: 15px;
+    margin-right: auto;
+    margin-left: auto;
+}
+
+.row {
+    display: flex;
+    flex-wrap: wrap;
+    margin-right: -15px;
+    margin-left: -15px;
+}
+
+.col-md-6 {
+    flex: 0 0 50%;
+    max-width: 50%;
+    padding-right: 15px;
+    padding-left: 15px;
+}

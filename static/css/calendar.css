@@ -1,0 +1,113 @@
+/* Стили для календаря */
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: var(--calendar-gap);
+    background-color: var(--calendar-border);
+    border: 1px solid var(--calendar-border);
+    border-radius: var(--calendar-radius);
+    overflow: hidden;
+}
+
+.calendar-header {
+    background-color: var(--light-color);
+    padding: 10px;
+    text-align: center;
+    font-weight: bold;
+    border-right: 1px solid var(--calendar-border);
+}
+
+.calendar-header:last-child {
+    border-right: none;
+}
+
+.calendar-day {
+    background-color: white;
+    min-height: 100px;
+    padding: 8px;
+    position: relative;
+    border-right: 1px solid var(--calendar-border);
+    border-bottom: 1px solid var(--calendar-border);
+}
+
+.calendar-day:nth-child(7n) {
+    border-right: none;
+}
+
+.calendar-day.other-month {
+    background-color: var(--light-color);
+    color: var(--secondary-color);
+}
+
+.calendar-day.today {
+    background-color: #e3f2fd;
+}
+
+.calendar-day.past-day {
+    background-color: #f8f9fa;
+}
+
+.calendar-day-number.disabled-day {
+    color: #6c757d;
+    opacity: 0.7;
+}
+
+.calendar-day-number {
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+.calendar-slots {
+    font-size: 0.8em;
+}
+
+.calendar-slot {
+    background-color: var(--slot-available-bg);
+    border-radius: 3px;
+    padding: 2px 4px;
+    margin-bottom: 2px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    transition: background-color 0.2s ease;
+}
+
+.calendar-slot:hover {
+    background-color: var(--slot-available-hover);
+}
+
+.calendar-slot.booked {
+    background-color: var(--slot-booked-bg);
+}
+
+.calendar-slot.past-date-available {
+    background-color: var(--slot-past-available-bg);
+    color: var(--secondary-color);
+}
+
+.calendar-slot-more {
+    background-color: var(--slot-more-bg);
+    border-radius: 3px;
+    padding: 2px 4px;
+    cursor: pointer;
+    text-align: center;
+    font-weight: bold;
+    transition: background-color 0.2s ease;
+}
+
+.calendar-slot-more:hover {
+    background-color: var(--slot-more-hover);
+}
+
+.calendar-slot.admin-add-slot {
+    background-color: var(--slot-admin-bg);
+    color: #004085;
+    font-weight: bold;
+    text-align: center;
+    font-size: 1.2em;
+}
+
+.calendar-slot.admin-add-slot:hover {
+    background-color: var(--slot-admin-hover);
+}
