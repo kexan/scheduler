@@ -4,31 +4,20 @@ use crate::scheduler::Scheduler;
 use include_dir::{Dir, include_dir};
 use std::path::Path;
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use tracing::{info, warn};
+use tracing::info;
 use warp::{Rejection, Reply};
 
-pub async fn start_server(port: u16) -> Result<()> {
+pub async fn start_server(scheduler: Scheduler, port: u16) -> Result<()> {
     info!("🚀 Starting web server on port {}", port);
 
-    let scheduler = match Scheduler::load().await {
-        Ok(sched) => {
-            info!(
-                "📂 Successfully loaded scheduler with {} slots",
-                sched.get_slots().len()
-            );
-            sched
-        }
-        Err(e) => {
-            warn!(
-                "⚠️  Error loading scheduler: {}. Starting with empty list",
-                e
-            );
-            Scheduler::new()
-        }
-    };
+    let slot_count = scheduler.get_slots().await.len();
+    if slot_count > 0 {
+        info!("📂 Successfully loaded scheduler with {} slots", slot_count);
+    } else {
+        info!("📂 Starting with empty scheduler (no data or empty file)");
+    }
 
-    let scheduler = Arc::new(RwLock::new(scheduler));
+    let scheduler = Arc::new(scheduler);
     info!("📅 Scheduler initialized");
 
     let routes = api::routes(scheduler);

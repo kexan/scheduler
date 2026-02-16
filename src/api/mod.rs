@@ -15,12 +15,11 @@ use crate::error::handle_rejection;
 use crate::scheduler::Scheduler;
 use crate::web;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use uuid::Uuid;
 use warp::{Filter, Reply};
 
 pub fn routes(
-    scheduler: Arc<RwLock<Scheduler>>,
+    scheduler: Arc<Scheduler>,
 ) -> impl Filter<Extract = impl Reply, Error = std::convert::Infallible> + Clone {
     let admin_password = std::env::var("ADMIN_PASSWORD").unwrap_or_else(|_| "admin123".to_string());
     let admin_token = AdminToken::new();
@@ -173,8 +172,8 @@ pub fn routes(
 }
 
 fn with_scheduler(
-    scheduler: Arc<RwLock<Scheduler>>,
-) -> impl Filter<Extract = (Arc<RwLock<Scheduler>>,), Error = std::convert::Infallible> + Clone {
+    scheduler: Arc<Scheduler>,
+) -> impl Filter<Extract = (Arc<Scheduler>,), Error = std::convert::Infallible> + Clone {
     warp::any().map(move || scheduler.clone())
 }
 

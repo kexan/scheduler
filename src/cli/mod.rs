@@ -55,22 +55,23 @@ pub enum Commands {
 
 pub async fn run_cli() -> Result<()> {
     let cli = Cli::parse();
+    let scheduler = Scheduler::new().await?;
 
     match cli.command {
         Commands::Server { port } => {
-            crate::web::start_server(port).await?;
+            crate::web::start_server(scheduler, port).await?;
         }
         Commands::List { available } => {
-            list_slots(available).await?;
+            list_slots(scheduler, available).await?;
         }
         Commands::Create { date, start, end } => {
-            create_slot(date, start, end).await?;
+            create_slot(scheduler, date, start, end).await?;
         }
         Commands::Delete { id } => {
-            delete_slot(id).await?;
+            delete_slot(scheduler, id).await?;
         }
         Commands::Show { id } => {
-            show_slot(id).await?;
+            show_slot(scheduler, id).await?;
         }
         Commands::Book {
             id,
@@ -79,16 +80,15 @@ pub async fn run_cli() -> Result<()> {
             company_id,
             download_email,
         } => {
-            book_slot(id, company, email, company_id, download_email).await?;
+            book_slot(scheduler, id, company, email, company_id, download_email).await?;
         }
     }
 
     Ok(())
 }
 
-async fn list_slots(available_only: bool) -> Result<()> {
-    let scheduler = Scheduler::load().await?;
-    let slots = scheduler.get_slots();
+async fn list_slots(scheduler: Scheduler, available_only: bool) -> Result<()> {
+    let slots = scheduler.get_slots().await;
 
     if slots.is_empty() {
         println!("📅 Слотов не найдено");
@@ -168,12 +168,15 @@ async fn list_slots(available_only: bool) -> Result<()> {
     Ok(())
 }
 
-async fn create_slot(date: NaiveDate, start: String, end: String) -> Result<()> {
+async fn create_slot(
+    scheduler: Scheduler,
+    date: NaiveDate,
+    start: String,
+    end: String,
+) -> Result<()> {
     let start_time = parse_time(&start)?;
     let end_time = parse_time(&end)?;
     validate_time_range(start_time, end_time)?;
-
-    let mut scheduler = Scheduler::load().await?;
 
     let request = CreateSlotRequest {
         date,
@@ -187,11 +190,10 @@ async fn create_slot(date: NaiveDate, start: String, end: String) -> Result<()> 
     Ok(())
 }
 
-async fn delete_slot(id: String) -> Result<()> {
+async fn delete_slot(scheduler: Scheduler, id: String) -> Result<()> {
     let slot_uuid = parse_uuid(&id)?;
-    let mut scheduler = Scheduler::load().await?;
 
-    if scheduler.delete_slot(slot_uuid).await? {
+    if scheduler.delete_slot(slot_uuid).await?.is_some() {
         println!("✅ Слот {} успешно удален", &id[..8.min(id.len())]);
     } else {
         warn!("❌ Attempted to delete non-existent slot: {}", id);
@@ -201,12 +203,11 @@ async fn delete_slot(id: String) -> Result<()> {
     Ok(())
 }
 
-async fn show_slot(id: String) -> Result<()> {
+async fn show_slot(scheduler: Scheduler, id: String) -> Result<()> {
     let slot_uuid = parse_uuid(&id)?;
-    let scheduler = Scheduler::load().await?;
 
-    if let Some(slot) = scheduler.get_slot(slot_uuid) {
-        print_slot_info(slot);
+    if let Some(slot) = scheduler.get_slot(slot_uuid).await {
+        print_slot_info(&slot);
     } else {
         println!("❌ Слот с ID {} не найден", &id[..8.min(id.len())]);
     }
@@ -215,6 +216,7 @@ async fn show_slot(id: String) -> Result<()> {
 }
 
 async fn book_slot(
+    scheduler: Scheduler,
     id: String,
     company: String,
     email: String,
@@ -222,7 +224,6 @@ async fn book_slot(
     download_email: String,
 ) -> Result<()> {
     let slot_uuid = parse_uuid(&id)?;
-    let mut scheduler = Scheduler::load().await?;
 
     let request = BookingRequest {
         company_name: company,
@@ -231,7 +232,7 @@ async fn book_slot(
         download_email,
     };
 
-    match scheduler.book_slot(slot_uuid, request).await {
+    match scheduler.book_slot(slot_uuid, request, false).await {
         Ok(slot) => {
             print_slot_booked(
                 &slot,
