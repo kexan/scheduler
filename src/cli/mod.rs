@@ -6,7 +6,7 @@ use crate::scheduler::Scheduler;
 use crate::{api::handlers::slots::CreateSlotRequest, scheduler::BookingRequest};
 use chrono::NaiveDate;
 use clap::{Parser, Subcommand};
-use tracing::{info, warn};
+use tracing::warn;
 
 #[derive(Parser)]
 #[command(name = "migration-scheduler")]
@@ -192,7 +192,6 @@ async fn delete_slot(id: String) -> Result<()> {
     let mut scheduler = Scheduler::load().await?;
 
     if scheduler.delete_slot(slot_uuid).await? {
-        info!("🗑️  Slot {} deleted successfully", &id[..8.min(id.len())]);
         println!("✅ Слот {} успешно удален", &id[..8.min(id.len())]);
     } else {
         warn!("❌ Attempted to delete non-existent slot: {}", id);
