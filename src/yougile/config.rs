@@ -48,7 +48,7 @@ impl Default for YougileSettings {
     fn default() -> Self {
         Self {
             enabled: false,
-            api_url: "https://api.yougile.com".to_string(),
+            api_url: "https://yougile.com".to_string(),
             api_token: String::new(),
             project_id: String::new(),
             project_title: String::new(),
@@ -62,7 +62,7 @@ impl Default for YougileSettings {
 }
 
 impl YougileSettings {
-    pub async fn save_yougile_settings(&self) -> Result<()> {
+    pub async fn save(&self) -> Result<()> {
         let content = serde_json::to_string_pretty(self).map_err(AppError::Json)?;
 
         let path = Path::new(SETTINGS_PATH)

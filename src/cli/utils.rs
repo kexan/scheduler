@@ -1,7 +1,7 @@
 use crate::error::{AppError, Result};
 use crate::scheduler::TimeSlot;
 use chrono::NaiveTime;
-use tracing::{error, info};
+use tracing::error;
 use uuid::Uuid;
 
 pub fn parse_time(time_str: &str) -> Result<NaiveTime> {
@@ -22,14 +22,6 @@ pub fn parse_uuid(id_str: &str) -> Result<Uuid> {
 }
 
 pub fn print_slot_created(slot: &TimeSlot) {
-    info!(
-        "✅ Slot created successfully - ID: {}, date: {}, time: {}-{}",
-        slot.id,
-        slot.date,
-        slot.start_time.format("%H:%M"),
-        slot.end_time.format("%H:%M")
-    );
-
     println!("✅ Слот успешно создан:");
     println!("   📅 Дата: {}", slot.date);
     println!(
@@ -41,11 +33,6 @@ pub fn print_slot_created(slot: &TimeSlot) {
 }
 
 pub fn print_slot_booked(slot: &TimeSlot, company: &str, company_id: &str) {
-    info!(
-        "📝 Slot {} booked by company: {} ({})",
-        slot.id, company, company_id
-    );
-
     println!("✅ Слот успешно забронирован:");
     println!("   🏢 Компания: {}", company);
     println!("   🏷️  ID компании: {}", company_id);

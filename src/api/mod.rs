@@ -14,13 +14,14 @@ use crate::api::handlers::yougile::{
 use crate::error::handle_rejection;
 use crate::scheduler::Scheduler;
 use crate::web;
+use crate::yougile::YougileIntegration;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use uuid::Uuid;
 use warp::{Filter, Reply};
 
 pub fn routes(
-    scheduler: Arc<RwLock<Scheduler>>,
+    scheduler: Arc<Scheduler>,
+    yougile: Arc<YougileIntegration>,
 ) -> impl Filter<Extract = impl Reply, Error = std::convert::Infallible> + Clone {
     let admin_password = std::env::var("ADMIN_PASSWORD").unwrap_or_else(|_| "admin123".to_string());
     let admin_token = AdminToken::new();
@@ -43,7 +44,8 @@ pub fn routes(
             Ok::<_, warp::Rejection>(token.check_auth(cookie).await.is_ok())
         });
 
-    let yougile_settings_filter = warp::any().and_then(load_yougile_settings_filter);
+    let yougile_filter = with_yougile(yougile.clone());
+    let scheduler_filter = with_scheduler(scheduler.clone());
 
     let api = warp::path("api");
 
@@ -51,7 +53,7 @@ pub fn routes(
         .and(warp::path("slots"))
         .and(warp::path::end())
         .and(warp::get())
-        .and(with_scheduler(scheduler.clone()))
+        .and(scheduler_filter.clone())
         .and_then(get_slots_handler);
 
     let admin_auth = api
@@ -79,7 +81,7 @@ pub fn routes(
         .and(warp::post())
         .and(warp::body::json())
         .and(admin_auth_required.clone())
-        .and(with_scheduler(scheduler.clone()))
+        .and(scheduler_filter.clone())
         .and_then(create_slot_handler);
 
     let book_slot = api
@@ -90,8 +92,8 @@ pub fn routes(
         .and(warp::post())
         .and(warp::body::json())
         .and(admin_auth_check)
-        .and(with_scheduler(scheduler.clone()))
-        .and(yougile_settings_filter)
+        .and(scheduler_filter.clone())
+        .and(yougile_filter.clone())
         .and_then(book_slot_handler);
 
     let delete_slot = api
@@ -100,8 +102,8 @@ pub fn routes(
         .and(warp::path::end())
         .and(warp::delete())
         .and(admin_auth_required.clone())
-        .and(with_scheduler(scheduler.clone()))
-        .and(yougile_settings_filter)
+        .and(scheduler_filter.clone())
+        .and(yougile_filter.clone())
         .and_then(delete_slot_handler);
 
     let update_slot = api
@@ -111,8 +113,8 @@ pub fn routes(
         .and(warp::put())
         .and(warp::body::json::<CreateSlotRequest>())
         .and(admin_auth_required.clone())
-        .and(with_scheduler(scheduler.clone()))
-        .and(yougile_settings_filter)
+        .and(scheduler_filter.clone())
+        .and(yougile_filter.clone())
         .and_then(update_slot_handler);
 
     let update_slot_full = api
@@ -123,8 +125,8 @@ pub fn routes(
         .and(warp::put())
         .and(warp::body::json::<UpdateSlotRequest>())
         .and(admin_auth_required.clone())
-        .and(with_scheduler(scheduler.clone()))
-        .and(yougile_settings_filter)
+        .and(scheduler_filter.clone())
+        .and(yougile_filter.clone())
         .and_then(update_slot_full_handler);
 
     let get_yougile_settings = api
@@ -133,7 +135,7 @@ pub fn routes(
         .and(warp::path::end())
         .and(warp::get())
         .and(admin_auth_required.clone())
-        .and(yougile_settings_filter)
+        .and(yougile_filter.clone())
         .and_then(get_yougile_settings_handler);
 
     let update_yougile_settings = api
@@ -143,6 +145,7 @@ pub fn routes(
         .and(warp::put())
         .and(warp::body::json::<handlers::YougileSettings>())
         .and(admin_auth_required.clone())
+        .and(yougile_filter.clone())
         .and_then(update_yougile_settings_handler);
 
     let test_yougile_connection = api
@@ -151,7 +154,7 @@ pub fn routes(
         .and(warp::path::end())
         .and(warp::post())
         .and(admin_auth_required.clone())
-        .and(yougile_settings_filter)
+        .and(yougile_filter.clone())
         .and_then(test_yougile_connection_handler);
 
     let static_route = warp::path::tail().and_then(web::static_handler);
@@ -173,9 +176,15 @@ pub fn routes(
 }
 
 fn with_scheduler(
-    scheduler: Arc<RwLock<Scheduler>>,
-) -> impl Filter<Extract = (Arc<RwLock<Scheduler>>,), Error = std::convert::Infallible> + Clone {
+    scheduler: Arc<Scheduler>,
+) -> impl Filter<Extract = (Arc<Scheduler>,), Error = std::convert::Infallible> + Clone {
     warp::any().map(move || scheduler.clone())
+}
+
+fn with_yougile(
+    yougile: Arc<YougileIntegration>,
+) -> impl Filter<Extract = (Arc<YougileIntegration>,), Error = std::convert::Infallible> + Clone {
+    warp::any().map(move || yougile.clone())
 }
 
 fn with_admin_password(
@@ -188,11 +197,4 @@ fn with_admin_token(
     token: AdminToken,
 ) -> impl Filter<Extract = (AdminToken,), Error = std::convert::Infallible> + Clone {
     warp::any().map(move || token.clone())
-}
-
-async fn load_yougile_settings_filter()
--> std::result::Result<handlers::YougileSettings, warp::Rejection> {
-    crate::yougile::config::load_yougile_settings()
-        .await
-        .map_err(warp::reject::custom)
 }
