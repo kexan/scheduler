@@ -50,27 +50,28 @@ impl Scheduler {
         }
     }
 
-    pub async fn load() -> Result<Self> {
-        let path = Path::new(SLOTS_PATH);
-        if !path.exists() {
-            debug!("💾 Data file {} does not exist, starting empty", SLOTS_PATH);
-            return Ok(Self::new());
+    fn from_slots(slots: Vec<TimeSlot>) -> Self {
+        let mut scheduler = Self::new();
+        for slot in slots {
+            scheduler.slots.insert(slot.id, slot);
         }
+        scheduler
+    }
 
-        let content = async_fs::read_to_string(SLOTS_PATH).await.map_err(|e| {
-            error!("💾 Failed to read data file {}: {}", SLOTS_PATH, e);
-            AppError::Io(e)
-        })?;
+    pub async fn load() -> Result<Self> {
+        let content = async_fs::read_to_string(SLOTS_PATH)
+            .await
+            .inspect_err(|e| error!("💾 Failed to read data file {}: {}", SLOTS_PATH, e))
+            .map_err(AppError::Io)?;
 
         if content.trim().is_empty() {
-            debug!("💾 Data file {} is empty", SLOTS_PATH);
+            debug!("💾 Data file {} is empty or missing", SLOTS_PATH);
             return Ok(Self::new());
         }
 
-        let slots: Vec<TimeSlot> = serde_json::from_str(&content).map_err(|e| {
-            error!("💾 Failed to parse JSON from file {}: {}", SLOTS_PATH, e);
-            AppError::Json(e)
-        })?;
+        let slots: Vec<TimeSlot> = serde_json::from_str(&content)
+            .inspect_err(|e| error!("💾 Failed to parse JSON from file {}: {}", SLOTS_PATH, e))
+            .map_err(AppError::Json)?;
 
         Ok(Self::from_slots(slots))
     }
@@ -79,27 +80,26 @@ impl Scheduler {
         let slots = self.get_slots();
         debug!("💾 Saving {} slots to file {}", slots.len(), SLOTS_PATH);
 
-        let json_content = serde_json::to_string_pretty(&slots).map_err(|e| {
-            error!("💾 Failed to serialize slots to JSON: {}", e);
-            AppError::Json(e)
-        })?;
+        let json_content = serde_json::to_string_pretty(&slots)
+            .inspect_err(|e| error!("💾 Failed to serialize slots to JSON: {}", e))
+            .map_err(AppError::Json)?;
 
         if let Some(parent) = Path::new(SLOTS_PATH).parent()
             && !parent.exists()
         {
             debug!("📁 Creating directory structure: {}", parent.display());
-            async_fs::create_dir_all(parent).await.map_err(|e| {
-                error!("💾 Failed to create directory {}: {}", parent.display(), e);
-                AppError::Io(e)
-            })?;
+            async_fs::create_dir_all(parent)
+                .await
+                .inspect_err(|e| {
+                    error!("💾 Failed to create directory {}: {}", parent.display(), e)
+                })
+                .map_err(AppError::Io)?;
         }
 
         async_fs::write(SLOTS_PATH, json_content)
             .await
-            .map_err(|e| {
-                error!("💾 Failed to write to file {}: {}", SLOTS_PATH, e);
-                AppError::Io(e)
-            })?;
+            .inspect_err(|e| error!("💾 Failed to write to file {}: {}", SLOTS_PATH, e))
+            .map_err(AppError::Io)?;
 
         debug!(
             "💾 Successfully saved {} slots to {}",
@@ -107,14 +107,6 @@ impl Scheduler {
             SLOTS_PATH
         );
         Ok(())
-    }
-
-    pub fn from_slots(slots: Vec<TimeSlot>) -> Self {
-        let mut scheduler = Self::new();
-        for slot in slots {
-            scheduler.slots.insert(slot.id, slot);
-        }
-        scheduler
     }
 
     pub fn create_slot(&mut self, request: CreateSlotRequest) -> TimeSlot {
