@@ -170,7 +170,6 @@ impl YougileInner {
             title: task_title,
             column_id: Some(self.settings.column_id.clone()),
             description: Some(task_description),
-            color: Some("task-blue".to_string()),
             ..Default::default()
         };
 
