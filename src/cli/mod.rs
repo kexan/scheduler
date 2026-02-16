@@ -91,7 +91,7 @@ async fn list_slots(scheduler: Scheduler, available_only: bool) -> Result<()> {
     let slots = scheduler.get_slots().await;
 
     if slots.is_empty() {
-        println!("📅 Слотов не найдено");
+        println!("Слотов не найдено");
         return Ok(());
     }
 
@@ -102,11 +102,11 @@ async fn list_slots(scheduler: Scheduler, available_only: bool) -> Result<()> {
     };
 
     if filtered_slots.is_empty() {
-        println!("📅 Доступных слотов не найдено");
+        println!("Доступных слотов не найдено");
         return Ok(());
     }
 
-    println!("📋 Список слотов:");
+    println!("Список слотов:");
     println!();
 
     use tabled::{Table, Tabled, settings::Style};
@@ -129,11 +129,11 @@ async fn list_slots(scheduler: Scheduler, available_only: bool) -> Result<()> {
         .iter()
         .map(|slot| {
             let (status, company) = if slot.is_available {
-                ("✅ Доступен", "-".to_string())
+                ("Доступен", "-".to_string())
             } else if let Some(booking) = &slot.booking {
-                ("🔒 Занят", booking.company_name.clone())
+                ("Занят", booking.company_name.clone())
             } else {
-                ("❓ Неизвестно", "-".to_string())
+                ("Неизвестно", "-".to_string())
             };
 
             SlotRow {
@@ -155,13 +155,13 @@ async fn list_slots(scheduler: Scheduler, available_only: bool) -> Result<()> {
     println!("{}", table);
 
     println!();
-    println!("📊 Всего слотов: {}", filtered_slots.len());
+    println!("Всего слотов: {}", filtered_slots.len());
     println!(
-        "✅ Доступно: {}",
+        "Доступно: {}",
         filtered_slots.iter().filter(|s| s.is_available).count()
     );
     println!(
-        "🔒 Занято: {}",
+        "Занято: {}",
         filtered_slots.iter().filter(|s| !s.is_available).count()
     );
 
@@ -194,10 +194,10 @@ async fn delete_slot(scheduler: Scheduler, id: String) -> Result<()> {
     let slot_uuid = parse_uuid(&id)?;
 
     if scheduler.delete_slot(slot_uuid).await?.is_some() {
-        println!("✅ Слот {} успешно удален", &id[..8.min(id.len())]);
+        println!("Слот {} успешно удален", &id[..8.min(id.len())]);
     } else {
-        warn!("❌ Attempted to delete non-existent slot: {}", id);
-        println!("❌ Слот с ID {} не найден", &id[..8.min(id.len())]);
+        warn!("Attempted to delete non-existent slot: {}", id);
+        println!("Слот с ID {} не найден", &id[..8.min(id.len())]);
     }
 
     Ok(())
@@ -209,7 +209,7 @@ async fn show_slot(scheduler: Scheduler, id: String) -> Result<()> {
     if let Some(slot) = scheduler.get_slot(slot_uuid).await {
         print_slot_info(&slot);
     } else {
-        println!("❌ Слот с ID {} не найден", &id[..8.min(id.len())]);
+        println!("Слот с ID {} не найден", &id[..8.min(id.len())]);
     }
 
     Ok(())
@@ -241,7 +241,7 @@ async fn book_slot(
             );
         }
         Err(e) => {
-            println!("❌ Ошибка бронирования: {}", e);
+            println!("Ошибка бронирования: {}", e);
         }
     }
 

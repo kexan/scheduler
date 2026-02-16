@@ -72,7 +72,7 @@ impl YougileSettings {
 
         write(SETTINGS_PATH, content).await.map_err(AppError::Io)?;
 
-        debug!("💾 Yougile settings saved to {}", SETTINGS_PATH);
+        debug!("Yougile settings saved to {}", SETTINGS_PATH);
         Ok(())
     }
 }
@@ -81,7 +81,7 @@ pub async fn load_yougile_settings() -> Result<YougileSettings> {
     let path = Path::new(SETTINGS_PATH);
     if !path.exists() {
         debug!(
-            "💾 Yougile settings file {} does not exist, using defaults",
+            "Yougile settings file {} does not exist, using defaults",
             SETTINGS_PATH
         );
         return Ok(YougileSettings::default());

@@ -30,7 +30,7 @@ pub async fn admin_auth_handler(
 
         Ok(warp::reply::with_header(response, "set-cookie", cookie).into_response())
     } else {
-        warn!("🚫 Failed admin authentication attempt");
+        warn!("Failed admin authentication attempt");
         Err(warp::reject::custom(AppError::Other(
             "Неверный пароль".to_string(),
         )))

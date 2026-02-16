@@ -22,53 +22,53 @@ pub fn parse_uuid(id_str: &str) -> Result<Uuid> {
 }
 
 pub fn print_slot_created(slot: &TimeSlot) {
-    println!("✅ Слот успешно создан:");
-    println!("   📅 Дата: {}", slot.date);
+    println!("Слот успешно создан:");
+    println!("   Дата: {}", slot.date);
     println!(
-        "   ⏰ Время: {} - {}",
+        "   Время: {} - {}",
         slot.start_time.format("%H:%M"),
         slot.end_time.format("%H:%M")
     );
-    println!("   🆔 ID: {}", slot.id);
+    println!("   ID: {}", slot.id);
 }
 
 pub fn print_slot_booked(slot: &TimeSlot, company: &str, company_id: &str) {
-    println!("✅ Слот успешно забронирован:");
-    println!("   🏢 Компания: {}", company);
-    println!("   🏷️  ID компании: {}", company_id);
-    println!("   📅 Дата: {}", slot.date);
+    println!("Слот успешно забронирован:");
+    println!("   Компания: {}", company);
+    println!("   ID компании: {}", company_id);
+    println!("   Дата: {}", slot.date);
     println!(
-        "   ⏰ Время: {} - {}",
+        "   Время: {} - {}",
         slot.start_time.format("%H:%M"),
         slot.end_time.format("%H:%M")
     );
 }
 
 pub fn print_slot_info(slot: &TimeSlot) {
-    println!("📋 Информация о слоте:");
-    println!("   🆔 ID: {}", slot.id);
-    println!("   📅 Дата: {}", slot.date);
+    println!("Информация о слоте:");
+    println!("   ID: {}", slot.id);
+    println!("   Дата: {}", slot.date);
     println!(
-        "   ⏰ Время: {} - {}",
+        "   Время: {} - {}",
         slot.start_time.format("%H:%M"),
         slot.end_time.format("%H:%M")
     );
     println!(
-        "   📊 Статус: {}",
+        "   Статус: {}",
         if slot.is_available {
-            "✅ Доступен"
+            "Доступен"
         } else {
-            "🔒 Занят"
+            "Занят"
         }
     );
 
     if let Some(booking) = &slot.booking {
-        println!("   🏢 Компания: {}", booking.company_name);
-        println!("   📧 Email админа: {}", booking.admin_email);
-        println!("   🏷️  ID компании: {}", booking.company_id);
-        println!("   📧 Email для скачивания: {}", booking.download_email);
+        println!("   Компания: {}", booking.company_name);
+        println!("   Email админа: {}", booking.admin_email);
+        println!("   ID компании: {}", booking.company_id);
+        println!("   Email для скачивания: {}", booking.download_email);
         println!(
-            "   📅 Создано: {}",
+            "   Создано: {}",
             booking.created_at.format("%Y-%m-%d %H:%M:%S")
         );
     }

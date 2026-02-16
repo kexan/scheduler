@@ -58,11 +58,11 @@ impl Scheduler {
         let content = match async_fs::read_to_string(SLOTS_PATH).await {
             Ok(c) => c,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                debug!("💾 No data file found, starting fresh");
+                debug!("No data file found, starting fresh");
                 return Ok(Self { inner });
             }
             Err(e) => {
-                error!("💾 Failed to read {}: {}", SLOTS_PATH, e);
+                error!("Failed to read {}: {}", SLOTS_PATH, e);
                 return Err(AppError::Io(e));
             }
         };
@@ -72,7 +72,7 @@ impl Scheduler {
         }
 
         let slots: Vec<TimeSlot> = serde_json::from_str(&content)
-            .inspect_err(|e| error!("💾 Failed to parse JSON from {}: {}", SLOTS_PATH, e))
+            .inspect_err(|e| error!("Failed to parse JSON from {}: {}", SLOTS_PATH, e))
             .map_err(AppError::Json)?;
 
         {
@@ -87,10 +87,10 @@ impl Scheduler {
 
     async fn save(&self) -> Result<()> {
         let slots = self.get_slots().await;
-        debug!("💾 Saving {} slots to file {}", slots.len(), SLOTS_PATH);
+        debug!("Saving {} slots to file {}", slots.len(), SLOTS_PATH);
 
         let json_content = serde_json::to_string_pretty(&slots)
-            .inspect_err(|e| error!("💾 Failed to serialize slots to JSON: {}", e))
+            .inspect_err(|e| error!("Failed to serialize slots to JSON: {}", e))
             .map_err(AppError::Json)?;
 
         if let Some(parent) = Path::new(SLOTS_PATH).parent()
@@ -99,22 +99,16 @@ impl Scheduler {
             debug!("📁 Creating directory structure: {}", parent.display());
             async_fs::create_dir_all(parent)
                 .await
-                .inspect_err(|e| {
-                    error!("💾 Failed to create directory {}: {}", parent.display(), e)
-                })
+                .inspect_err(|e| error!("Failed to create directory {}: {}", parent.display(), e))
                 .map_err(AppError::Io)?;
         }
 
         async_fs::write(SLOTS_PATH, json_content)
             .await
-            .inspect_err(|e| error!("💾 Failed to write to file {}: {}", SLOTS_PATH, e))
+            .inspect_err(|e| error!("Failed to write to file {}: {}", SLOTS_PATH, e))
             .map_err(AppError::Io)?;
 
-        debug!(
-            "💾 Successfully saved {} slots to {}",
-            slots.len(),
-            SLOTS_PATH
-        );
+        debug!("Successfully saved {} slots to {}", slots.len(), SLOTS_PATH);
         Ok(())
     }
 
@@ -136,7 +130,7 @@ impl Scheduler {
         };
         self.save().await?;
 
-        info!("➕ Created new slot: {} for date {}", slot.id, slot.date);
+        info!("Created new slot: {} for date {}", slot.id, slot.date);
         Ok(slot)
     }
 
@@ -176,7 +170,7 @@ impl Scheduler {
 
         self.save().await?;
         info!(
-            "📝 Slot {} booked by company: {}",
+            "Slot {} booked by company: {}",
             slot_id,
             slot.booking
                 .as_ref()
@@ -205,7 +199,7 @@ impl Scheduler {
         };
         if removed.is_some() {
             self.save().await?;
-            info!("🗑️  Slot {} deleted successfully", id);
+            info!("Slot {} deleted successfully", id);
         }
         Ok(removed)
     }
@@ -238,7 +232,7 @@ impl Scheduler {
         self.save().await?;
 
         info!(
-            "✏️  Slot {} updated to date: {}, time: {}-{}",
+            "Slot {} updated to date: {}, time: {}-{}",
             slot.id, slot.date, slot.start_time, slot.end_time
         );
         Ok(slot)
@@ -276,7 +270,7 @@ impl Scheduler {
         self.save().await?;
 
         info!(
-            "📝 Slot {} fully updated - date: {}, available: {}, has_booking: {}",
+            "Slot {} fully updated - date: {}, available: {}, has_booking: {}",
             slot.id,
             slot.date,
             slot.is_available,
