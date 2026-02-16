@@ -1,13 +1,16 @@
 pub mod config;
 
-use crate::error::AppError;
-use crate::scheduler::TimeSlot;
-use crate::yougile::config::*;
 use std::sync::Arc;
 use thiserror::Error;
+use tokio::sync::RwLock;
+use tracing::{debug, error, info};
 use yougile_api_client::YouGileClient;
 use yougile_api_client::apis::configuration::Configuration;
 use yougile_api_client::models::{CreateTask, UpdateTask};
+
+use crate::error::AppError;
+use crate::scheduler::TimeSlot;
+use crate::yougile::config::*;
 
 #[derive(Error, Debug)]
 pub enum YougileError {
@@ -28,12 +31,120 @@ impl From<YougileError> for AppError {
 }
 
 pub struct YougileIntegration {
+    inner: Arc<RwLock<YougileInner>>,
+}
+
+struct YougileInner {
     client: Option<YouGileClient>,
     settings: YougileSettings,
 }
 
 impl YougileIntegration {
-    pub fn new(settings: YougileSettings) -> Self {
+    pub async fn new() -> Result<Self, YougileError> {
+        let settings = load_yougile_settings()
+            .await
+            .map_err(|e| YougileError::Api(e.to_string()))?;
+
+        let inner = Arc::new(RwLock::new(YougileInner::new(settings)));
+
+        Ok(Self { inner })
+    }
+
+    pub async fn update_settings(&self, settings: YougileSettings) -> Result<(), YougileError> {
+        settings
+            .save()
+            .await
+            .map_err(|e| YougileError::Api(e.to_string()))?;
+
+        let mut inner = self.inner.write().await;
+        *inner = YougileInner::new(settings);
+        Ok(())
+    }
+
+    pub async fn settings(&self) -> YougileSettings {
+        self.inner.read().await.settings.clone()
+    }
+
+    pub async fn is_enabled(&self) -> bool {
+        self.inner.read().await.is_enabled()
+    }
+
+    pub async fn create_task(&self, slot: &TimeSlot) -> Option<String> {
+        let state = self.inner.read().await;
+
+        if !state.is_enabled() {
+            info!("Yougile integration disabled, skipping task creation");
+            return None;
+        }
+
+        match state.create_migration_task(slot).await {
+            Ok(task_id) => {
+                info!("✅ Created Yougile task: {} for slot {}", task_id, slot.id);
+                Some(task_id)
+            }
+            Err(e) => {
+                error!(
+                    "❌ Failed to create Yougile task for slot {}: {}",
+                    slot.id, e
+                );
+                None
+            }
+        }
+    }
+
+    pub async fn update_task(&self, slot: &TimeSlot) {
+        let state = self.inner.read().await;
+
+        if !state.is_enabled() {
+            debug!("Yougile integration disabled, skipping task update");
+            return;
+        }
+
+        match state.update_migration_task(slot).await {
+            Ok(_) => {
+                info!("✅ Updated Yougile task for slot {}", slot.id);
+            }
+            Err(e) => {
+                error!(
+                    "❌ Failed to update Yougile task for slot {}: {}",
+                    slot.id, e
+                );
+            }
+        }
+    }
+
+    pub async fn delete_task(&self, task_id: &str) {
+        let state = self.inner.read().await;
+
+        if !state.is_enabled() {
+            debug!("Yougile integration disabled, skipping task deletion");
+            return;
+        }
+
+        match state.delete_migration_task(task_id).await {
+            Ok(_) => {
+                info!("✅ Deleted Yougile task: {}", task_id);
+            }
+            Err(e) => {
+                error!("❌ Failed to delete Yougile task {}: {}", task_id, e);
+            }
+        }
+    }
+
+    pub async fn load_full_map(&self) -> Result<Vec<ProjectInfo>, YougileError> {
+        let state = self.inner.read().await;
+
+        if !state.is_enabled() {
+            debug!("Yougile integration disabled, skipping loading");
+            return Err(YougileError::Disabled);
+        }
+
+        state.load_full_map().await
+    }
+}
+
+impl YougileInner {
+    fn new(settings: YougileSettings) -> Self {
         let client = if settings.enabled && !settings.api_token.is_empty() {
             let config =
                 Configuration::new(settings.api_token.clone()).with_base_path(&settings.api_url);
@@ -45,7 +156,7 @@ impl YougileIntegration {
         Self { client, settings }
     }
 
-    pub fn is_enabled(&self) -> bool {
+    fn is_enabled(&self) -> bool {
         self.settings.enabled && self.client.is_some()
     }
 
@@ -205,7 +316,7 @@ impl YougileIntegration {
         Ok(columns.content)
     }
 
-    pub async fn load_full_map(&self) -> Result<Vec<ProjectInfo>, YougileError> {
+    async fn load_full_map(&self) -> Result<Vec<ProjectInfo>, YougileError> {
         let projects = self.get_projects().await?;
 
         let mut projects_map = Vec::new();
@@ -240,78 +351,5 @@ impl YougileIntegration {
         }
 
         Ok(projects_map)
-    }
-}
-
-pub async fn create_yougile_task(
-    yougile: &Arc<tokio::sync::RwLock<YougileIntegration>>,
-    slot: &TimeSlot,
-) -> Option<String> {
-    let yougile_integration = yougile.read().await;
-
-    if !yougile_integration.is_enabled() {
-        tracing::info!("Yougile integration disabled, skipping task creation");
-        return None;
-    }
-
-    match yougile_integration.create_migration_task(slot).await {
-        Ok(task_id) => {
-            tracing::info!("✅ Created Yougile task: {} for slot {}", task_id, slot.id);
-            Some(task_id)
-        }
-        Err(e) => {
-            tracing::error!(
-                "❌ Failed to create Yougile task for slot {}: {}",
-                slot.id,
-                e
-            );
-            None
-        }
-    }
-}
-
-pub async fn update_yougile_task(
-    yougile: &Arc<tokio::sync::RwLock<YougileIntegration>>,
-    slot: &TimeSlot,
-) {
-    let yougile_integration = yougile.read().await;
-
-    if !yougile_integration.is_enabled() {
-        tracing::debug!("Yougile integration disabled, skipping task update");
-        return;
-    }
-
-    match yougile_integration.update_migration_task(slot).await {
-        Ok(_) => {
-            tracing::info!("✅ Updated Yougile task for slot {}", slot.id);
-        }
-        Err(e) => {
-            tracing::error!(
-                "❌ Failed to update Yougile task for slot {}: {}",
-                slot.id,
-                e
-            );
-        }
-    }
-}
-
-pub async fn delete_yougile_task(
-    yougile: &Arc<tokio::sync::RwLock<YougileIntegration>>,
-    task_id: &str,
-) {
-    let yougile_integration = yougile.read().await;
-
-    if !yougile_integration.is_enabled() {
-        tracing::debug!("Yougile integration disabled, skipping task deletion");
-        return;
-    }
-
-    match yougile_integration.delete_migration_task(task_id).await {
-        Ok(_) => {
-            tracing::info!("✅ Deleted Yougile task: {}", task_id);
-        }
-        Err(e) => {
-            tracing::error!("❌ Failed to delete Yougile task {}: {}", task_id, e);
-        }
     }
 }

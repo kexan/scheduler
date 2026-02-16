@@ -1,6 +1,7 @@
 use crate::api;
 use crate::error::Result;
 use crate::scheduler::Scheduler;
+use crate::yougile::YougileIntegration;
 use include_dir::{Dir, include_dir};
 use std::path::Path;
 use std::sync::Arc;
@@ -20,7 +21,10 @@ pub async fn start_server(scheduler: Scheduler, port: u16) -> Result<()> {
     let scheduler = Arc::new(scheduler);
     info!("📅 Scheduler initialized");
 
-    let routes = api::routes(scheduler);
+    let yougile = Arc::new(YougileIntegration::new().await?);
+    info!("🔗 Yougile integration initialized");
+
+    let routes = api::routes(scheduler, yougile);
 
     let addr = ([127, 0, 0, 1], port);
     info!("🌐 Server starting at http://localhost:{}", port);
