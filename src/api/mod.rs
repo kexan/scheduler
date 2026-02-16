@@ -26,7 +26,6 @@ pub fn routes(
     let admin_password = std::env::var("ADMIN_PASSWORD").unwrap_or_else(|_| "admin123".to_string());
     let admin_token = AdminToken::new();
     let cors = warp::cors()
-        .allow_any_origin()
         .allow_headers(vec!["content-type"])
         .allow_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
         .allow_credentials(true);
