@@ -21,7 +21,7 @@ pub async fn admin_auth_handler(
     admin_token: AdminToken,
 ) -> Result<warp::reply::Response, Rejection> {
     if request.password == admin_password {
-        let (_token, cookie) = admin_token.create_session().await;
+        let cookie = admin_token.create_session().await;
 
         let response = warp::reply::json(&AdminAuthResponse {
             success: true,
@@ -32,7 +32,7 @@ pub async fn admin_auth_handler(
     } else {
         warn!("🚫 Failed admin authentication attempt");
         Err(warp::reject::custom(AppError::Other(
-            "Неверный пароль".to_string()
+            "Неверный пароль".to_string(),
         )))
     }
 }
@@ -47,8 +47,12 @@ pub async fn check_auth_handler(
     admin_token: AdminToken,
 ) -> Result<warp::reply::Json, Rejection> {
     if admin_token.check_auth(cookie_header).await.is_ok() {
-        Ok(warp::reply::json(&CheckAuthResponse { authenticated: true }))
+        Ok(warp::reply::json(&CheckAuthResponse {
+            authenticated: true,
+        }))
     } else {
-        Ok(warp::reply::json(&CheckAuthResponse { authenticated: false }))
+        Ok(warp::reply::json(&CheckAuthResponse {
+            authenticated: false,
+        }))
     }
 }
