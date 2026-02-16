@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 use tokio::fs as async_fs;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 use uuid::Uuid;
 
 use crate::api::handlers::slots::{CreateSlotRequest, UpdateSlotRequest};
@@ -76,7 +76,7 @@ impl Scheduler {
         Ok(Self::from_slots(slots))
     }
 
-    pub async fn save(&self) -> Result<()> {
+    async fn save(&self) -> Result<()> {
         let slots = self.get_slots();
         debug!("💾 Saving {} slots to file {}", slots.len(), SLOTS_PATH);
 
@@ -109,7 +109,7 @@ impl Scheduler {
         Ok(())
     }
 
-    pub fn create_slot(&mut self, request: CreateSlotRequest) -> TimeSlot {
+    pub async fn create_slot(&mut self, request: CreateSlotRequest) -> Result<TimeSlot> {
         let slot = TimeSlot {
             id: Uuid::new_v4(),
             start_time: request.start_time,
@@ -121,11 +121,14 @@ impl Scheduler {
         };
 
         self.slots.insert(slot.id, slot.clone());
-        slot
+        self.save().await?;
+
+        info!("➕ Created new slot: {} for date {}", slot.id, slot.date);
+        Ok(slot)
     }
 
-    pub fn book_slot(&mut self, slot_id: Uuid, request: BookingRequest) -> Result<TimeSlot> {
-        match self.slots.get_mut(&slot_id) {
+    pub async fn book_slot(&mut self, slot_id: Uuid, request: BookingRequest) -> Result<TimeSlot> {
+        let slot = match self.slots.get_mut(&slot_id) {
             Some(slot) if slot.is_available => {
                 let booking = Booking {
                     company_name: request.company_name,
@@ -136,13 +139,23 @@ impl Scheduler {
                 };
 
                 slot.is_available = false;
-                slot.booking = Some(booking.clone());
-
-                Ok(slot.clone())
+                slot.booking = Some(booking);
+                slot.clone()
             }
-            Some(_) => Err(AppError::SlotAlreadyBooked),
-            None => Err(AppError::SlotNotFound),
-        }
+            Some(_) => return Err(AppError::SlotAlreadyBooked),
+            None => return Err(AppError::SlotNotFound),
+        };
+
+        self.save().await?;
+        info!(
+            "📝 Slot {} booked by company: {}",
+            slot_id,
+            slot.booking
+                .as_ref()
+                .map(|b| &b.company_name)
+                .unwrap_or(&"Unknown".to_string())
+        );
+        Ok(slot)
     }
 
     pub fn get_slots(&self) -> Vec<TimeSlot> {
@@ -155,58 +168,86 @@ impl Scheduler {
         self.slots.get(&id)
     }
 
-    pub fn delete_slot(&mut self, id: Uuid) -> bool {
-        self.slots.remove(&id).is_some()
+    pub async fn delete_slot(&mut self, id: Uuid) -> Result<bool> {
+        let existed = self.slots.remove(&id).is_some();
+        if existed {
+            self.save().await?;
+            info!("🗑️  Slot {} deleted successfully", id);
+        }
+        Ok(existed)
     }
 
-    pub fn set_yougile_task_id(&mut self, slot_id: Uuid, task_id: String) -> Option<TimeSlot> {
-        if let Some(slot) = self.slots.get_mut(&slot_id) {
-            slot.yougile_task_id = Some(task_id);
-            return Some(slot.clone());
-        }
-        None
+    pub async fn set_yougile_task_id(
+        &mut self,
+        slot_id: Uuid,
+        task_id: String,
+    ) -> Result<TimeSlot> {
+        let slot = self.slots.get_mut(&slot_id).ok_or(AppError::SlotNotFound)?;
+
+        slot.yougile_task_id = Some(task_id);
+        let slot = slot.clone();
+
+        self.save().await?;
+        Ok(slot)
     }
 
-    pub fn update_slot(&mut self, id: Uuid, request: CreateSlotRequest) -> Result<TimeSlot> {
-        match self.slots.get_mut(&id) {
-            Some(slot) => {
-                slot.date = request.date;
-                slot.start_time = request.start_time;
-                slot.end_time = request.end_time;
-                Ok(slot.clone())
-            }
-            None => Err(AppError::SlotNotFound),
-        }
+    pub async fn update_slot(&mut self, id: Uuid, request: CreateSlotRequest) -> Result<TimeSlot> {
+        let slot = self.slots.get_mut(&id).ok_or(AppError::SlotNotFound)?;
+
+        slot.date = request.date;
+        slot.start_time = request.start_time;
+        slot.end_time = request.end_time;
+        let slot = slot.clone();
+
+        self.save().await?;
+
+        info!(
+            "✏️  Slot {} updated to date: {}, time: {}-{}",
+            slot.id, slot.date, slot.start_time, slot.end_time
+        );
+        Ok(slot)
     }
 
-    pub fn update_slot_full(&mut self, id: Uuid, request: UpdateSlotRequest) -> Result<TimeSlot> {
-        match self.slots.get_mut(&id) {
-            Some(slot) => {
-                slot.date = request.date;
-                slot.start_time = request.start_time;
-                slot.end_time = request.end_time;
+    pub async fn update_slot_full(
+        &mut self,
+        id: Uuid,
+        request: UpdateSlotRequest,
+    ) -> Result<TimeSlot> {
+        let slot = self.slots.get_mut(&id).ok_or(AppError::SlotNotFound)?;
 
-                if let Some(is_available) = request.is_available {
-                    slot.is_available = is_available;
-                }
+        slot.date = request.date;
+        slot.start_time = request.start_time;
+        slot.end_time = request.end_time;
 
-                if let Some(partial_booking) = request.booking {
-                    let booking = Booking {
-                        company_name: partial_booking.company_name,
-                        admin_email: partial_booking.admin_email,
-                        company_id: partial_booking.company_id,
-                        download_email: partial_booking.download_email,
-                        created_at: chrono::Utc::now(),
-                    };
-                    slot.booking = Some(booking);
-                    slot.is_available = false;
-                } else if request.is_available == Some(false) {
-                    slot.booking = None;
-                }
-
-                Ok(slot.clone())
-            }
-            None => Err(AppError::SlotNotFound),
+        if let Some(is_available) = request.is_available {
+            slot.is_available = is_available;
         }
+
+        if let Some(partial_booking) = request.booking {
+            let booking = Booking {
+                company_name: partial_booking.company_name,
+                admin_email: partial_booking.admin_email,
+                company_id: partial_booking.company_id,
+                download_email: partial_booking.download_email,
+                created_at: Utc::now(),
+            };
+            slot.booking = Some(booking);
+            slot.is_available = false;
+        } else if request.is_available == Some(false) {
+            slot.booking = None;
+        }
+
+        let slot = slot.clone();
+        self.save().await?;
+
+        info!(
+            "📝 Slot {} fully updated - date: {}, available: {}, has_booking: {}",
+            slot.id,
+            slot.date,
+            slot.is_available,
+            slot.booking.is_some()
+        );
+
+        Ok(slot)
     }
 }

@@ -8,7 +8,7 @@ use chrono::{NaiveDate, NaiveTime};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{error, info, warn};
+use tracing::warn;
 use uuid::Uuid;
 use warp::Rejection;
 
@@ -35,37 +35,12 @@ pub async fn get_slots_handler(
     Ok(warp::reply::json(&slots))
 }
 
-async fn execute_with_save<F, R>(
-    scheduler: Arc<RwLock<Scheduler>>,
-    operation: F,
-) -> Result<R, AppError>
-where
-    F: FnOnce(&mut Scheduler) -> Result<R, AppError>,
-{
-    let result = {
-        let mut sched = scheduler.write().await;
-        operation(&mut sched)?
-    };
-
-    if let Err(e) = scheduler.read().await.save().await {
-        tracing::error!("💾 Failed to save slots after operation: {}", e);
-        return Err(AppError::Other(format!("Ошибка сохранения: {}", e)));
-    }
-
-    Ok(result)
-}
-
 pub async fn create_slot_handler(
     request: CreateSlotRequest,
     scheduler: Arc<RwLock<Scheduler>>,
 ) -> Result<warp::reply::Json, Rejection> {
-    let slot = execute_with_save(scheduler.clone(), |sched| {
-        let slot = sched.create_slot(request);
-        info!("➕ Created new slot: {} for date {}", slot.id, slot.date);
-        Ok(slot)
-    })
-    .await
-    .map_err(warp::reject::custom)?;
+    let mut sched = scheduler.write().await;
+    let slot = sched.create_slot(request).await?;
 
     Ok(warp::reply::json(&slot))
 }
@@ -92,20 +67,10 @@ pub async fn book_slot_handler(
         }
     }
 
-    let slot = execute_with_save(scheduler.clone(), |sched| {
-        sched.book_slot(slot_id, request.clone())
-    })
-    .await
-    .map_err(warp::reject::custom)?;
-
-    info!(
-        "📝 Slot {} booked by company: {}",
-        slot_id,
-        slot.booking
-            .as_ref()
-            .map(|b| &b.company_name)
-            .unwrap_or(&"Unknown".to_string())
-    );
+    let slot = {
+        let mut sched = scheduler.write().await;
+        sched.book_slot(slot_id, request.clone()).await
+    }?;
 
     if yougile_settings.enabled {
         let yougile_integration = Arc::new(tokio::sync::RwLock::new(YougileIntegration::new(
@@ -117,12 +82,7 @@ pub async fn book_slot_handler(
             let task_id = create_yougile_task(&yougile_integration, &slot_clone).await;
             if let Some(task_id) = task_id {
                 let mut sched = scheduler_clone.write().await;
-                if let Some(_updated_slot) = sched.set_yougile_task_id(slot_clone.id, task_id) {
-                    drop(sched);
-                    if let Err(e) = scheduler_clone.read().await.save().await {
-                        tracing::error!("💾 Failed to save task_id: {}", e);
-                    }
-                }
+                let _ = sched.set_yougile_task_id(slot_clone.id, task_id).await;
             }
         });
     }
@@ -144,16 +104,10 @@ pub async fn delete_slot_handler(
 
     let deleted = {
         let mut sched = scheduler.write().await;
-        sched.delete_slot(slot_id)
+        sched.delete_slot(slot_id).await?
     };
 
     if deleted {
-        info!("🗑️  Slot {} deleted successfully", slot_id);
-
-        if let Err(e) = scheduler.read().await.save().await {
-            error!("💾 Failed to save slots after deletion: {}", e);
-        }
-
         if yougile_settings.enabled
             && let Some(task_id) = yougile_task_id
         {
@@ -164,7 +118,6 @@ pub async fn delete_slot_handler(
                 delete_yougile_task(&yougile_integration, &task_id).await;
             });
         }
-
         Ok(warp::reply::json(&serde_json::json!({"success": true})))
     } else {
         warn!("❌ Attempted to delete non-existent slot: {}", slot_id);
@@ -178,20 +131,8 @@ pub async fn update_slot_handler(
     scheduler: Arc<RwLock<Scheduler>>,
     yougile_settings: YougileSettings,
 ) -> Result<warp::reply::Json, Rejection> {
-    let slot = {
-        let mut sched = scheduler.write().await;
-        sched.update_slot(slot_id, request)
-    }
-    .map_err(warp::reject::custom)?;
-
-    info!(
-        "✏️  Slot {} updated to date: {}, time: {}-{}",
-        slot_id, slot.date, slot.start_time, slot.end_time
-    );
-
-    if let Err(e) = scheduler.read().await.save().await {
-        error!("💾 Failed to save slots after update: {}", e);
-    }
+    let mut sched = scheduler.write().await;
+    let slot = sched.update_slot(slot_id, request).await?;
 
     if yougile_settings.enabled {
         let yougile_integration = Arc::new(tokio::sync::RwLock::new(YougileIntegration::new(
@@ -212,23 +153,8 @@ pub async fn update_slot_full_handler(
     scheduler: Arc<RwLock<Scheduler>>,
     yougile_settings: YougileSettings,
 ) -> Result<warp::reply::Json, Rejection> {
-    let slot = {
-        let mut sched = scheduler.write().await;
-        sched.update_slot_full(slot_id, request)
-    }
-    .map_err(warp::reject::custom)?;
-
-    info!(
-        "📝 Slot {} fully updated - date: {}, available: {}, has_booking: {}",
-        slot_id,
-        slot.date,
-        slot.is_available,
-        slot.booking.is_some()
-    );
-
-    if let Err(e) = scheduler.read().await.save().await {
-        error!("💾 Failed to save slots after full update: {}", e);
-    }
+    let mut sched = scheduler.write().await;
+    let slot = sched.update_slot_full(slot_id, request).await?;
 
     if yougile_settings.enabled {
         let yougile_integration = Arc::new(tokio::sync::RwLock::new(YougileIntegration::new(
@@ -241,12 +167,7 @@ pub async fn update_slot_full_handler(
                 let task_id = create_yougile_task(&yougile_integration, &slot_clone).await;
                 if let Some(task_id) = task_id {
                     let mut sched = scheduler_clone.write().await;
-                    if let Some(_updated) = sched.set_yougile_task_id(slot_clone.id, task_id) {
-                        drop(sched);
-                        if let Err(e) = scheduler_clone.read().await.save().await {
-                            tracing::error!("💾 Failed to save task_id: {}", e);
-                        }
-                    }
+                    let _ = sched.set_yougile_task_id(slot_clone.id, task_id).await;
                 }
             } else {
                 update_yougile_task(&yougile_integration, &slot_clone).await;

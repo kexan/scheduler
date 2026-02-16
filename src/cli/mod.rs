@@ -181,8 +181,7 @@ async fn create_slot(date: NaiveDate, start: String, end: String) -> Result<()> 
         end_time,
     };
 
-    let slot = scheduler.create_slot(request);
-    scheduler.save().await?;
+    let slot = scheduler.create_slot(request).await?;
     print_slot_created(&slot);
 
     Ok(())
@@ -192,8 +191,7 @@ async fn delete_slot(id: String) -> Result<()> {
     let slot_uuid = parse_uuid(&id)?;
     let mut scheduler = Scheduler::load().await?;
 
-    if scheduler.delete_slot(slot_uuid) {
-        scheduler.save().await?;
+    if scheduler.delete_slot(slot_uuid).await? {
         info!("🗑️  Slot {} deleted successfully", &id[..8.min(id.len())]);
         println!("✅ Слот {} успешно удален", &id[..8.min(id.len())]);
     } else {
@@ -234,9 +232,8 @@ async fn book_slot(
         download_email,
     };
 
-    match scheduler.book_slot(slot_uuid, request) {
+    match scheduler.book_slot(slot_uuid, request).await {
         Ok(slot) => {
-            scheduler.save().await?;
             print_slot_booked(
                 &slot,
                 &slot.booking.as_ref().unwrap().company_name,
