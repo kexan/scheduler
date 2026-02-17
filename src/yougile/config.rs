@@ -63,16 +63,23 @@ impl Default for YougileSettings {
 
 impl YougileSettings {
     pub async fn save(&self) -> Result<()> {
-        let content = serde_json::to_string_pretty(self).map_err(AppError::Json)?;
+        let json = serde_json::to_vec_pretty(self).map_err(AppError::Json)?;
 
-        let path = Path::new(SETTINGS_PATH)
-            .parent()
-            .ok_or_else(|| AppError::Other("Invalid file path".to_string()))?;
-        create_dir_all(path).await.map_err(AppError::Io)?;
+        let path = Path::new(SETTINGS_PATH);
+        let tmp_path = path.with_extension("json.tmp");
 
-        write(SETTINGS_PATH, content).await.map_err(AppError::Io)?;
+        if let Some(parent) = path.parent() {
+            create_dir_all(parent).await.map_err(AppError::Io)?;
+        }
 
-        debug!("Yougile settings saved to {}", SETTINGS_PATH);
+        write(&tmp_path, &json).await.map_err(AppError::Io)?;
+
+        write(&tmp_path, &json).await.map_err(AppError::Io)?;
+
+        tokio::fs::rename(&tmp_path, path)
+            .await
+            .map_err(AppError::Io)?;
+
         Ok(())
     }
 }

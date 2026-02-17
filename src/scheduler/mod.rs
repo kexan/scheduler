@@ -87,28 +87,26 @@ impl Scheduler {
 
     async fn save(&self) -> Result<()> {
         let slots = self.get_slots().await;
-        debug!("Saving {} slots to file {}", slots.len(), SLOTS_PATH);
 
-        let json_content = serde_json::to_string_pretty(&slots)
-            .inspect_err(|e| error!("Failed to serialize slots to JSON: {}", e))
-            .map_err(AppError::Json)?;
+        let json = serde_json::to_vec_pretty(&slots).map_err(AppError::Json)?;
 
-        if let Some(parent) = Path::new(SLOTS_PATH).parent()
-            && !parent.exists()
-        {
-            debug!("📁 Creating directory structure: {}", parent.display());
+        let path = Path::new(SLOTS_PATH);
+        let tmp_path = path.with_extension("json.tmp");
+
+        if let Some(parent) = path.parent() {
             async_fs::create_dir_all(parent)
                 .await
-                .inspect_err(|e| error!("Failed to create directory {}: {}", parent.display(), e))
                 .map_err(AppError::Io)?;
         }
 
-        async_fs::write(SLOTS_PATH, json_content)
+        async_fs::write(&tmp_path, &json)
             .await
-            .inspect_err(|e| error!("Failed to write to file {}: {}", SLOTS_PATH, e))
             .map_err(AppError::Io)?;
 
-        debug!("Successfully saved {} slots to {}", slots.len(), SLOTS_PATH);
+        async_fs::rename(&tmp_path, path)
+            .await
+            .map_err(AppError::Io)?;
+
         Ok(())
     }
 
