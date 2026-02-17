@@ -83,10 +83,7 @@ impl YougileIntegration {
                 Some(task_id)
             }
             Err(e) => {
-                error!(
-                    "Failed to create Yougile task for slot {}: {}",
-                    slot.id, e
-                );
+                error!("Failed to create Yougile task for slot {}: {}", slot.id, e);
                 None
             }
         }
@@ -105,10 +102,7 @@ impl YougileIntegration {
                 info!("Updated Yougile task for slot {}", slot.id);
             }
             Err(e) => {
-                error!(
-                    "Failed to update Yougile task for slot {}: {}",
-                    slot.id, e
-                );
+                error!("Failed to update Yougile task for slot {}: {}", slot.id, e);
             }
         }
     }
