@@ -26,7 +26,7 @@ use error::AppError;
 async fn main() -> Result<(), AppError> {
     init_logging();
 
-    info!("🚀 Migration Scheduler starting...");
+    info!("Migration Scheduler starting...");
 
     cli::run_cli().await
 }

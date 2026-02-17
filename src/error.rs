@@ -49,7 +49,9 @@ impl AppError {
     }
 }
 
-pub async fn handle_rejection(err: Rejection) -> std::result::Result<Response, std::convert::Infallible> {
+pub async fn handle_rejection(
+    err: Rejection,
+) -> std::result::Result<Response, std::convert::Infallible> {
     if let Some(app_error) = err.find::<AppError>() {
         let status = app_error.status_code();
         let json = warp::reply::json(&serde_json::json!({
@@ -60,10 +62,9 @@ pub async fn handle_rejection(err: Rejection) -> std::result::Result<Response, s
         let json = warp::reply::json(&serde_json::json!({
             "error": "Internal Server Error"
         }));
-        Ok(warp::reply::with_status(
-            json,
-            warp::http::StatusCode::INTERNAL_SERVER_ERROR,
+        Ok(
+            warp::reply::with_status(json, warp::http::StatusCode::INTERNAL_SERVER_ERROR)
+                .into_response(),
         )
-        .into_response())
     }
 }

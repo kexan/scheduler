@@ -4,6 +4,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
+use tokio::time;
+use tracing::{debug, info};
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -15,9 +17,26 @@ const SESSION_DURATION: Duration = Duration::from_secs(3600);
 
 impl AdminToken {
     pub fn new() -> Self {
-        Self {
-            tokens: Arc::new(RwLock::new(HashMap::new())),
-        }
+        let tokens = Arc::new(RwLock::new(HashMap::new()));
+
+        let tokens_clone = tokens.clone();
+        tokio::spawn(async move {
+            loop {
+                time::sleep(SESSION_DURATION).await;
+                let now = Instant::now();
+                let mut tokens_guard = tokens_clone.write().await;
+                let before = tokens_guard.len();
+                tokens_guard.retain(|_, expires| *expires > now);
+                let removed = before - tokens_guard.len();
+                if removed > 0 {
+                    info!("Cleaned up {} expired sessions", removed);
+                } else {
+                    debug!("No expired sessions to clean up");
+                }
+            }
+        });
+
+        Self { tokens }
     }
 
     fn hash_token(token: &str) -> Vec<u8> {

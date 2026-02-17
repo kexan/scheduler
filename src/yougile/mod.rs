@@ -79,14 +79,11 @@ impl YougileIntegration {
 
         match state.create_migration_task(slot).await {
             Ok(task_id) => {
-                info!("✅ Created Yougile task: {} for slot {}", task_id, slot.id);
+                info!("Created Yougile task: {} for slot {}", task_id, slot.id);
                 Some(task_id)
             }
             Err(e) => {
-                error!(
-                    "❌ Failed to create Yougile task for slot {}: {}",
-                    slot.id, e
-                );
+                error!("Failed to create Yougile task for slot {}: {}", slot.id, e);
                 None
             }
         }
@@ -102,13 +99,10 @@ impl YougileIntegration {
 
         match state.update_migration_task(slot).await {
             Ok(_) => {
-                info!("✅ Updated Yougile task for slot {}", slot.id);
+                info!("Updated Yougile task for slot {}", slot.id);
             }
             Err(e) => {
-                error!(
-                    "❌ Failed to update Yougile task for slot {}: {}",
-                    slot.id, e
-                );
+                error!("Failed to update Yougile task for slot {}: {}", slot.id, e);
             }
         }
     }
@@ -123,10 +117,10 @@ impl YougileIntegration {
 
         match state.delete_migration_task(task_id).await {
             Ok(_) => {
-                info!("✅ Deleted Yougile task: {}", task_id);
+                info!("Deleted Yougile task: {}", task_id);
             }
             Err(e) => {
-                error!("❌ Failed to delete Yougile task {}: {}", task_id, e);
+                error!("Failed to delete Yougile task {}: {}", task_id, e);
             }
         }
     }
