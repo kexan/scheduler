@@ -2,8 +2,7 @@ pub mod utils;
 
 use crate::cli::utils::*;
 use crate::error::Result;
-use crate::scheduler::Scheduler;
-use crate::{api::handlers::slots::CreateSlotRequest, scheduler::BookingRequest};
+use crate::scheduler::{CreateBooking, CreateTimeSlot, Scheduler};
 use chrono::NaiveDate;
 use clap::{Parser, Subcommand};
 use tracing::warn;
@@ -178,7 +177,7 @@ async fn create_slot(
     let end_time = parse_time(&end)?;
     validate_time_range(start_time, end_time)?;
 
-    let request = CreateSlotRequest {
+    let request = CreateTimeSlot {
         date,
         start_time,
         end_time,
@@ -225,7 +224,7 @@ async fn book_slot(
 ) -> Result<()> {
     let slot_uuid = parse_uuid(&id)?;
 
-    let request = BookingRequest {
+    let request = CreateBooking {
         company_name: company,
         admin_email: email,
         company_id,

@@ -1,5 +1,11 @@
+use axum::{
+    Json,
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
+use serde_json::json;
 use thiserror::Error;
-use warp::{Rejection, Reply, reply::Response};
+use yougile_api_client::YougileError;
 
 #[derive(Error, Debug)]
 pub enum AppError {
@@ -36,35 +42,25 @@ pub enum AppError {
 
 pub type Result<T> = std::result::Result<T, AppError>;
 
-impl warp::reject::Reject for AppError {}
+impl IntoResponse for AppError {
+    fn into_response(self) -> Response {
+        let (status, error_message) = match self {
+            AppError::Unauthorized => (StatusCode::UNAUTHORIZED, self.to_string()),
+            AppError::SlotNotFound => (StatusCode::NOT_FOUND, self.to_string()),
+            AppError::SlotAlreadyBooked => (StatusCode::CONFLICT, self.to_string()),
+            _ => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+        };
 
-impl AppError {
-    pub fn status_code(&self) -> warp::http::StatusCode {
-        match self {
-            AppError::Unauthorized => warp::http::StatusCode::UNAUTHORIZED,
-            AppError::SlotNotFound => warp::http::StatusCode::NOT_FOUND,
-            AppError::SlotAlreadyBooked => warp::http::StatusCode::CONFLICT,
-            _ => warp::http::StatusCode::INTERNAL_SERVER_ERROR,
-        }
+        let body = Json(json!({
+            "error": error_message
+        }));
+
+        (status, body).into_response()
     }
 }
 
-pub async fn handle_rejection(
-    err: Rejection,
-) -> std::result::Result<Response, std::convert::Infallible> {
-    if let Some(app_error) = err.find::<AppError>() {
-        let status = app_error.status_code();
-        let json = warp::reply::json(&serde_json::json!({
-            "error": app_error.to_string()
-        }));
-        Ok(warp::reply::with_status(json, status).into_response())
-    } else {
-        let json = warp::reply::json(&serde_json::json!({
-            "error": "Internal Server Error"
-        }));
-        Ok(
-            warp::reply::with_status(json, warp::http::StatusCode::INTERNAL_SERVER_ERROR)
-                .into_response(),
-        )
+impl From<YougileError> for AppError {
+    fn from(e: YougileError) -> Self {
+        AppError::Yougile(e.to_string())
     }
 }

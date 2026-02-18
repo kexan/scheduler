@@ -298,7 +298,9 @@ class Modals {
 
       DOMHelper.setChecked('yougileEnabled', settings.enabled);
       DOMHelper.set('yougileApiUrl', settings.api_url);
-      DOMHelper.set('yougileApiToken', settings.api_token);
+      if (settings.api_token !== undefined) {
+        DOMHelper.set('yougileApiToken', settings.api_token);
+      }
 
       // Store current settings and map
       this.currentYougileSettings = {
@@ -396,10 +398,11 @@ class Modals {
   }
 
   async saveYougileSettings() {
+    const apiTokenInput = DOMHelper.get('yougileApiToken');
+
     const settings = {
       enabled: DOMHelper.isChecked('yougileEnabled'),
       api_url: DOMHelper.get('yougileApiUrl').value,
-      api_token: DOMHelper.get('yougileApiToken').value,
       project_id: DOMHelper.get('yougileProjectId').value,
       project_title: this.getSelectText('yougileProjectId'),
       board_id: DOMHelper.get('yougileBoardId').value,
@@ -409,8 +412,13 @@ class Modals {
       projects_map: this.projectsMap || []
     };
 
+    if (apiTokenInput.value) {
+      settings.api_token = apiTokenInput.value;
+    }
+
     try {
       await this.scheduler.api.updateYougileSettings(settings);
+      apiTokenInput.value = '';
       this.hideModal('yougileSettingsModal');
     } catch (error) {
       Utils.showError('Ошибка сохранения настроек: ' + error.message);

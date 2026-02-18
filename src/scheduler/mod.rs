@@ -1,132 +1,60 @@
-use chrono::{DateTime, NaiveTime, Utc};
-use serde::{Deserialize, Serialize};
+pub mod models;
+pub mod storage;
+
 use std::collections::HashMap;
-use std::path::Path;
 use std::sync::Arc;
-use tokio::fs as async_fs;
-use tokio::sync::RwLock;
-use tracing::{debug, error, info};
+use tokio::sync::Mutex;
+use tracing::{error, info};
 use uuid::Uuid;
 
-use crate::api::handlers::slots::{CreateSlotRequest, UpdateSlotRequest};
 use crate::error::{AppError, Result};
-
-const SLOTS_PATH: &str = "data/slots.json";
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TimeSlot {
-    pub id: Uuid,
-    pub start_time: NaiveTime,
-    pub end_time: NaiveTime,
-    pub date: chrono::NaiveDate,
-    pub is_available: bool,
-    pub booking: Option<Booking>,
-    pub yougile_task_id: Option<String>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Booking {
-    pub company_name: String,
-    pub admin_email: String,
-    pub company_id: String,
-    pub download_email: String,
-    pub created_at: DateTime<Utc>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BookingRequest {
-    pub company_name: String,
-    pub admin_email: String,
-    pub company_id: String,
-    pub download_email: String,
-}
+pub use crate::scheduler::models::{
+    Booking, CreateBooking, CreateTimeSlot, TimeSlot, UpdateTimeSlot,
+};
+use crate::scheduler::storage::{load_slots, save_slots};
 
 pub struct Scheduler {
-    inner: Arc<RwLock<SchedulerInner>>,
-}
-
-struct SchedulerInner {
-    slots: HashMap<Uuid, TimeSlot>,
+    inner: Arc<Mutex<HashMap<Uuid, TimeSlot>>>,
 }
 
 impl Scheduler {
     pub async fn new() -> Result<Self> {
-        let inner = Arc::new(RwLock::new(SchedulerInner {
-            slots: HashMap::new(),
-        }));
+        let slots_map: HashMap<Uuid, TimeSlot> = load_slots()
+            .await?
+            .into_iter()
+            .map(|slot| (slot.id, slot))
+            .collect();
 
-        let content = match async_fs::read_to_string(SLOTS_PATH).await {
-            Ok(c) => c,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                debug!("No data file found, starting fresh");
-                return Ok(Self { inner });
-            }
-            Err(e) => {
-                error!("Failed to read {}: {}", SLOTS_PATH, e);
-                return Err(AppError::Io(e));
-            }
-        };
-
-        if content.trim().is_empty() {
-            return Ok(Self { inner });
-        }
-
-        let slots: Vec<TimeSlot> = serde_json::from_str(&content)
-            .inspect_err(|e| error!("Failed to parse JSON from {}: {}", SLOTS_PATH, e))
-            .map_err(AppError::Json)?;
-
-        {
-            let mut inner = inner.write().await;
-            for slot in slots {
-                inner.slots.insert(slot.id, slot);
-            }
-        }
+        let inner = Arc::new(Mutex::new(slots_map));
 
         Ok(Self { inner })
     }
 
-    async fn save(&self) -> Result<()> {
+    async fn do_save(&self) -> Result<()> {
         let slots = self.get_slots().await;
 
-        let json = serde_json::to_vec_pretty(&slots).map_err(AppError::Json)?;
-
-        let path = Path::new(SLOTS_PATH);
-        let tmp_path = path.with_extension("json.tmp");
-
-        if let Some(parent) = path.parent() {
-            async_fs::create_dir_all(parent)
-                .await
-                .map_err(AppError::Io)?;
-        }
-
-        async_fs::write(&tmp_path, &json)
+        save_slots(&slots)
             .await
-            .map_err(AppError::Io)?;
-
-        async_fs::rename(&tmp_path, path)
-            .await
-            .map_err(AppError::Io)?;
-
-        Ok(())
+            .inspect_err(|e| error!("Failed to save slots: {}", e))
     }
 
-    pub async fn create_slot(&self, request: CreateSlotRequest) -> Result<TimeSlot> {
+    pub async fn create_slot(&self, create_timeslot: CreateTimeSlot) -> Result<TimeSlot> {
         let slot = {
-            let mut inner = self.inner.write().await;
+            let mut inner = self.inner.lock().await;
             let slot = TimeSlot {
                 id: Uuid::new_v4(),
-                start_time: request.start_time,
-                end_time: request.end_time,
-                date: request.date,
+                start_time: create_timeslot.start_time,
+                end_time: create_timeslot.end_time,
+                date: create_timeslot.date,
                 is_available: true,
                 booking: None,
                 yougile_task_id: None,
             };
 
-            inner.slots.insert(slot.id, slot.clone());
+            inner.insert(slot.id, slot.clone());
             slot
         };
-        self.save().await?;
+        self.do_save().await?;
 
         info!("Created new slot: {} for date {}", slot.id, slot.date);
         Ok(slot)
@@ -135,14 +63,14 @@ impl Scheduler {
     pub async fn book_slot(
         &self,
         slot_id: Uuid,
-        request: BookingRequest,
+        create_booking: CreateBooking,
         is_admin: bool,
     ) -> Result<TimeSlot> {
         let today = chrono::Local::now().date_naive();
 
         let slot = {
-            let mut inner = self.inner.write().await;
-            match inner.slots.get_mut(&slot_id) {
+            let mut inner = self.inner.lock().await;
+            match inner.get_mut(&slot_id) {
                 Some(slot) if slot.is_available || is_admin => {
                     if slot.date <= today && !is_admin {
                         return Err(AppError::Other(
@@ -150,11 +78,11 @@ impl Scheduler {
                         ));
                     }
                     let booking = Booking {
-                        company_name: request.company_name,
-                        admin_email: request.admin_email,
-                        company_id: request.company_id,
-                        download_email: request.download_email,
-                        created_at: Utc::now(),
+                        company_name: create_booking.company_name,
+                        admin_email: create_booking.admin_email,
+                        company_id: create_booking.company_id,
+                        download_email: create_booking.download_email,
+                        created_at: chrono::Utc::now(),
                     };
 
                     slot.is_available = false;
@@ -166,7 +94,7 @@ impl Scheduler {
             }
         };
 
-        self.save().await?;
+        self.do_save().await?;
         info!(
             "Slot {} booked by company: {}",
             slot_id,
@@ -179,24 +107,27 @@ impl Scheduler {
     }
 
     pub async fn get_slots(&self) -> Vec<TimeSlot> {
-        let inner = self.inner.read().await;
-        let mut slots: Vec<_> = inner.slots.values().cloned().collect();
+        let mut slots: Vec<TimeSlot> = {
+            let inner = self.inner.lock().await;
+            inner.values().cloned().collect()
+        };
+
         slots.sort_by(|a, b| a.date.cmp(&b.date).then(a.start_time.cmp(&b.start_time)));
         slots
     }
 
     pub async fn get_slot(&self, id: Uuid) -> Option<TimeSlot> {
-        let inner = self.inner.read().await;
-        inner.slots.get(&id).cloned()
+        let inner = self.inner.lock().await;
+        inner.get(&id).cloned()
     }
 
     pub async fn delete_slot(&self, id: Uuid) -> Result<Option<TimeSlot>> {
         let removed = {
-            let mut inner = self.inner.write().await;
-            inner.slots.remove(&id)
+            let mut inner = self.inner.lock().await;
+            inner.remove(&id)
         };
         if removed.is_some() {
-            self.save().await?;
+            self.do_save().await?;
             info!("Slot {} deleted successfully", id);
         }
         Ok(removed)
@@ -204,30 +135,31 @@ impl Scheduler {
 
     pub async fn set_yougile_task_id(&self, slot_id: Uuid, task_id: String) -> Result<TimeSlot> {
         let slot = {
-            let mut inner = self.inner.write().await;
-            let slot = inner
-                .slots
-                .get_mut(&slot_id)
-                .ok_or(AppError::SlotNotFound)?;
+            let mut inner = self.inner.lock().await;
+            let slot = inner.get_mut(&slot_id).ok_or(AppError::SlotNotFound)?;
 
             slot.yougile_task_id = Some(task_id);
             slot.clone()
         };
-        self.save().await?;
+        self.do_save().await?;
         Ok(slot)
     }
 
-    pub async fn update_slot(&self, id: Uuid, request: CreateSlotRequest) -> Result<TimeSlot> {
+    pub async fn update_slot(
+        &self,
+        id: Uuid,
+        create_time_slot: CreateTimeSlot,
+    ) -> Result<TimeSlot> {
         let slot = {
-            let mut inner = self.inner.write().await;
-            let slot = inner.slots.get_mut(&id).ok_or(AppError::SlotNotFound)?;
+            let mut inner = self.inner.lock().await;
+            let slot = inner.get_mut(&id).ok_or(AppError::SlotNotFound)?;
 
-            slot.date = request.date;
-            slot.start_time = request.start_time;
-            slot.end_time = request.end_time;
+            slot.date = create_time_slot.date;
+            slot.start_time = create_time_slot.start_time;
+            slot.end_time = create_time_slot.end_time;
             slot.clone()
         };
-        self.save().await?;
+        self.do_save().await?;
 
         info!(
             "Slot {} updated to date: {}, time: {}-{}",
@@ -236,36 +168,46 @@ impl Scheduler {
         Ok(slot)
     }
 
-    pub async fn update_slot_full(&self, id: Uuid, request: UpdateSlotRequest) -> Result<TimeSlot> {
+    pub async fn update_slot_full(
+        &self,
+        id: Uuid,
+        update_time_slot: UpdateTimeSlot,
+    ) -> Result<TimeSlot> {
         let slot = {
-            let mut inner = self.inner.write().await;
-            let slot = inner.slots.get_mut(&id).ok_or(AppError::SlotNotFound)?;
+            let mut inner = self.inner.lock().await;
+            let slot = inner.get_mut(&id).ok_or(AppError::SlotNotFound)?;
 
-            slot.date = request.date;
-            slot.start_time = request.start_time;
-            slot.end_time = request.end_time;
+            if let Some(date) = update_time_slot.date {
+                slot.date = date;
+            }
+            if let Some(start_time) = update_time_slot.start_time {
+                slot.start_time = start_time;
+            }
+            if let Some(end_time) = update_time_slot.end_time {
+                slot.end_time = end_time;
+            }
 
-            if let Some(is_available) = request.is_available {
+            if let Some(is_available) = update_time_slot.is_available {
                 slot.is_available = is_available;
             }
 
-            if let Some(partial_booking) = request.booking {
+            if let Some(partial_booking) = update_time_slot.booking {
                 let booking = Booking {
                     company_name: partial_booking.company_name,
                     admin_email: partial_booking.admin_email,
                     company_id: partial_booking.company_id,
                     download_email: partial_booking.download_email,
-                    created_at: Utc::now(),
+                    created_at: chrono::Utc::now(),
                 };
                 slot.booking = Some(booking);
                 slot.is_available = false;
-            } else if request.is_available == Some(false) {
+            } else if update_time_slot.is_available == Some(false) {
                 slot.booking = None;
             }
 
             slot.clone()
         };
-        self.save().await?;
+        self.do_save().await?;
 
         info!(
             "Slot {} fully updated - date: {}, available: {}, has_booking: {}",
