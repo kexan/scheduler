@@ -66,7 +66,7 @@ pub fn print_slot_info(slot: &TimeSlot) {
         println!("   Компания: {}", booking.company_name);
         println!("   Email админа: {}", booking.admin_email);
         println!("   ID компании: {}", booking.company_id);
-        println!("   Email для скачивания: {}", booking.download_email);
+        println!("   Email получателя архива: {}", booking.download_email);
         println!(
             "   Создано: {}",
             booking.created_at.format("%Y-%m-%d %H:%M:%S")
