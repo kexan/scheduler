@@ -167,7 +167,7 @@ class Api {
 
       if (response.ok) {
         Utils.showSuccess('Настройки Yougile сохранены');
-        return await response.json();
+        return;
       } else {
         const error = await response.json();
         throw new Error(error.error || 'Ошибка сохранения настроек');

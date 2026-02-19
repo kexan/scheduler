@@ -1,8 +1,13 @@
-use crate::api::auth_token::AdminToken;
+use crate::api::AppState;
 use crate::error::AppError;
+use axum::{
+    Json,
+    extract::State,
+    http::HeaderMap,
+    response::{IntoResponse, Response},
+};
 use serde::{Deserialize, Serialize};
 use tracing::warn;
-use warp::{Rejection, Reply};
 
 #[derive(Deserialize)]
 pub struct AdminAuthRequest {
@@ -16,24 +21,28 @@ pub struct AdminAuthResponse {
 }
 
 pub async fn admin_auth_handler(
-    request: AdminAuthRequest,
-    admin_password: String,
-    admin_token: AdminToken,
-) -> Result<warp::reply::Response, Rejection> {
-    if request.password == admin_password {
-        let cookie = admin_token.create_session().await;
+    State(state): State<AppState>,
+    Json(request): Json<AdminAuthRequest>,
+) -> Result<Response, AppError> {
+    if request.password == state.admin_password {
+        let cookie = state.admin_token.create_session().await;
 
-        let response = warp::reply::json(&AdminAuthResponse {
+        let mut response = Json(AdminAuthResponse {
             success: true,
             message: "Авторизация успешна".to_string(),
-        });
+        })
+        .into_response();
 
-        Ok(warp::reply::with_header(response, "set-cookie", cookie).into_response())
+        let headers = response.headers_mut();
+        headers.insert(
+            axum::http::HeaderName::from_static("set-cookie"),
+            cookie.parse().unwrap(),
+        );
+
+        Ok(response)
     } else {
         warn!("Failed admin authentication attempt");
-        Err(warp::reject::custom(AppError::Other(
-            "Неверный пароль".to_string(),
-        )))
+        Err(AppError::Other("Неверный пароль".to_string()))
     }
 }
 
@@ -43,15 +52,20 @@ pub struct CheckAuthResponse {
 }
 
 pub async fn check_auth_handler(
-    cookie_header: Option<String>,
-    admin_token: AdminToken,
-) -> Result<warp::reply::Json, Rejection> {
-    if admin_token.check_auth(cookie_header).await.is_ok() {
-        Ok(warp::reply::json(&CheckAuthResponse {
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Json<CheckAuthResponse>, AppError> {
+    let cookie = headers
+        .get("cookie")
+        .and_then(|v| v.to_str().ok())
+        .map(String::from);
+
+    if state.admin_token.check_auth(cookie).await.is_ok() {
+        Ok(Json(CheckAuthResponse {
             authenticated: true,
         }))
     } else {
-        Ok(warp::reply::json(&CheckAuthResponse {
+        Ok(Json(CheckAuthResponse {
             authenticated: false,
         }))
     }

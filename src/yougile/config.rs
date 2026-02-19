@@ -1,35 +1,18 @@
-use crate::error::{AppError, Result};
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 use tokio::fs::{create_dir_all, read_to_string, write};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ColumnInfo {
-    pub id: String,
-    pub title: String,
-}
+use crate::error::{AppError, Result};
+use crate::yougile::models::ProjectInfo;
+
+const SETTINGS_PATH: &str = "data/yougile_config.json";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BoardInfo {
-    pub id: String,
-    pub title: String,
-    pub columns: Vec<ColumnInfo>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectInfo {
-    pub id: String,
-    pub title: String,
-    pub boards: Vec<BoardInfo>,
-}
-
-const SETTINGS_PATH: &str = "yougile_settings.json";
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct YougileSettings {
+pub struct YougileConfig {
     pub enabled: bool,
     pub api_url: String,
+    #[serde(default)]
     pub api_token: String,
     pub project_id: String,
     #[serde(default)]
@@ -44,7 +27,7 @@ pub struct YougileSettings {
     pub projects_map: Vec<ProjectInfo>,
 }
 
-impl Default for YougileSettings {
+impl Default for YougileConfig {
     fn default() -> Self {
         Self {
             enabled: false,
@@ -61,7 +44,7 @@ impl Default for YougileSettings {
     }
 }
 
-impl YougileSettings {
+impl YougileConfig {
     pub async fn save(&self) -> Result<()> {
         let json = serde_json::to_vec_pretty(self).map_err(AppError::Json)?;
 
@@ -74,8 +57,6 @@ impl YougileSettings {
 
         write(&tmp_path, &json).await.map_err(AppError::Io)?;
 
-        write(&tmp_path, &json).await.map_err(AppError::Io)?;
-
         tokio::fs::rename(&tmp_path, path)
             .await
             .map_err(AppError::Io)?;
@@ -84,14 +65,14 @@ impl YougileSettings {
     }
 }
 
-pub async fn load_yougile_settings() -> Result<YougileSettings> {
+pub async fn load_yougile_settings() -> Result<YougileConfig> {
     let path = Path::new(SETTINGS_PATH);
     if !path.exists() {
         debug!(
             "Yougile settings file {} does not exist, using defaults",
             SETTINGS_PATH
         );
-        return Ok(YougileSettings::default());
+        return Ok(YougileConfig::default());
     }
 
     let content = read_to_string(SETTINGS_PATH).await.map_err(AppError::Io)?;

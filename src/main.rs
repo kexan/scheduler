@@ -1,14 +1,11 @@
-mod api;
-mod cli;
-mod error;
-mod scheduler;
-mod web;
-mod yougile;
-
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-fn init_logging() {
+use migration_scheduler::cli;
+use migration_scheduler::error::AppError;
+
+#[tokio::main]
+async fn main() -> Result<(), AppError> {
     tracing_subscriber::registry()
         .with(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -18,14 +15,6 @@ fn init_logging() {
         .init();
 
     info!("Logging initialized");
-}
-
-use error::AppError;
-
-#[tokio::main]
-async fn main() -> Result<(), AppError> {
-    init_logging();
-
     info!("Migration Scheduler starting...");
 
     cli::run_cli().await
