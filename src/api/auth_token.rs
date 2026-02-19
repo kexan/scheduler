@@ -3,28 +3,28 @@ use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::sync::RwLock;
+use tokio::sync::Mutex;
 use tokio::time;
 use tracing::{debug, info};
 use uuid::Uuid;
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct AdminToken {
-    tokens: Arc<RwLock<HashMap<Vec<u8>, Instant>>>,
+    tokens: Arc<Mutex<HashMap<Vec<u8>, Instant>>>,
 }
 
 const SESSION_DURATION: Duration = Duration::from_secs(3600);
 
 impl AdminToken {
     pub fn new() -> Self {
-        let tokens = Arc::new(RwLock::new(HashMap::new()));
+        let tokens = Arc::new(Mutex::new(HashMap::new()));
 
         let tokens_clone = tokens.clone();
         tokio::spawn(async move {
             loop {
                 time::sleep(SESSION_DURATION).await;
                 let now = Instant::now();
-                let mut tokens_guard = tokens_clone.write().await;
+                let mut tokens_guard = tokens_clone.lock().await;
                 let before = tokens_guard.len();
                 tokens_guard.retain(|_, expires| *expires > now);
                 let removed = before - tokens_guard.len();
@@ -50,7 +50,7 @@ impl AdminToken {
         let hash = Self::hash_token(&token);
         let expires = Instant::now() + SESSION_DURATION;
 
-        self.tokens.write().await.insert(hash, expires);
+        self.tokens.lock().await.insert(hash, expires);
 
         let max_age = SESSION_DURATION.as_secs();
 
@@ -62,7 +62,7 @@ impl AdminToken {
 
     pub async fn verify(&self, token: &str) -> bool {
         let hash = Self::hash_token(token);
-        let mut tokens = self.tokens.write().await;
+        let mut tokens = self.tokens.lock().await;
 
         match tokens.get(&hash) {
             Some(expiration) => {

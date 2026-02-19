@@ -1,199 +1,113 @@
+pub mod auth_middleware;
 pub mod auth_token;
 pub mod handlers;
 
+use crate::api::auth_middleware::auth_middleware;
 use crate::api::auth_token::AdminToken;
-use crate::api::handlers::auth::{admin_auth_handler, check_auth_handler};
-use crate::api::handlers::slots::{
-    CreateSlotRequest, UpdateSlotRequest, book_slot_handler, create_slot_handler,
-    delete_slot_handler, get_slots_handler, update_slot_full_handler, update_slot_handler,
-};
-use crate::api::handlers::yougile::{
-    get_yougile_settings_handler, test_yougile_connection_handler, update_yougile_settings_handler,
-};
-
-use crate::error::handle_rejection;
+use crate::api::handlers::{auth, slots, yougile};
 use crate::scheduler::Scheduler;
-use crate::web;
-use crate::yougile::YougileIntegration;
+use crate::yougile::YougileClient;
+use axum::{
+    Router,
+    extract::Path,
+    http::StatusCode,
+    middleware::from_fn_with_state,
+    response::{IntoResponse, Response},
+    routing::{delete, get, post, put},
+};
+use include_dir::{Dir, include_dir};
 use std::sync::Arc;
-use uuid::Uuid;
-use warp::{Filter, Reply};
+use tower_http::cors::CorsLayer;
 
-pub fn routes(
-    scheduler: Arc<Scheduler>,
-    yougile: Arc<YougileIntegration>,
-) -> impl Filter<Extract = impl Reply, Error = std::convert::Infallible> + Clone {
+const STATIC_DIR: Dir<'static> = include_dir!("$CARGO_MANIFEST_DIR/static");
+
+pub fn routes(scheduler: Arc<Scheduler>, yougile: Arc<YougileClient>) -> Router {
     let admin_password = std::env::var("ADMIN_PASSWORD").unwrap_or_else(|_| "admin123".to_string());
     let admin_token = AdminToken::new();
-    let cors = warp::cors()
-        .allow_headers(vec!["content-type"])
-        .allow_methods(vec!["GET", "POST", "PUT", "DELETE", "OPTIONS"])
-        .allow_credentials(true);
 
-    let admin_auth_required = warp::header::optional::<String>("cookie")
-        .and(with_admin_token(admin_token.clone()))
-        .and_then(|cookie: Option<String>, token: AdminToken| async move {
-            token.check_auth(cookie).await.map_err(warp::reject::custom)
-        })
-        .untuple_one();
+    let app_state = AppState {
+        scheduler: scheduler.clone(),
+        yougile: yougile.clone(),
+        admin_password: admin_password.clone(),
+        admin_token: admin_token.clone(),
+    };
 
-    let admin_auth_check = warp::header::optional::<String>("cookie")
-        .and(with_admin_token(admin_token.clone()))
-        .and_then(|cookie: Option<String>, token: AdminToken| async move {
-            Ok::<_, warp::Rejection>(token.check_auth(cookie).await.is_ok())
-        });
+    let cors = CorsLayer::permissive();
 
-    let yougile_filter = with_yougile(yougile.clone());
-    let scheduler_filter = with_scheduler(scheduler.clone());
+    let public_routes = Router::new()
+        .route("/", get(root_handler))
+        .route("/api/slots", get(slots::get_slots_handler))
+        .route("/api/auth/admin", post(auth::admin_auth_handler))
+        .route("/api/auth/check", get(auth::check_auth_handler))
+        .route("/{*path}", get(static_handler));
 
-    let api = warp::path("api");
+    let protected_routes = Router::new()
+        .route("/api/slots", post(slots::create_slot_handler))
+        .route("/api/slots/{id}/book", post(slots::book_slot_handler))
+        .route("/api/slots/{id}", delete(slots::delete_slot_handler))
+        .route("/api/slots/{id}", put(slots::update_slot_handler))
+        .route(
+            "/api/yougile/settings",
+            get(yougile::get_yougile_config_handler),
+        )
+        .route(
+            "/api/yougile/settings",
+            put(yougile::update_yougile_config_handler),
+        )
+        .route(
+            "/api/yougile/test",
+            post(yougile::test_yougile_connection_handler),
+        )
+        .layer(from_fn_with_state(app_state.clone(), auth_middleware));
 
-    let get_slots = api
-        .and(warp::path("slots"))
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(scheduler_filter.clone())
-        .and_then(get_slots_handler);
-
-    let admin_auth = api
-        .and(warp::path("auth"))
-        .and(warp::path("admin"))
-        .and(warp::path::end())
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(with_admin_password(admin_password.clone()))
-        .and(with_admin_token(admin_token.clone()))
-        .and_then(admin_auth_handler);
-
-    let check_auth = api
-        .and(warp::path("auth"))
-        .and(warp::path("check"))
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(warp::header::optional::<String>("cookie"))
-        .and(with_admin_token(admin_token.clone()))
-        .and_then(check_auth_handler);
-
-    let create_slot = api
-        .and(warp::path("slots"))
-        .and(warp::path::end())
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(admin_auth_required.clone())
-        .and(scheduler_filter.clone())
-        .and_then(create_slot_handler);
-
-    let book_slot = api
-        .and(warp::path("slots"))
-        .and(warp::path::param::<Uuid>())
-        .and(warp::path("book"))
-        .and(warp::path::end())
-        .and(warp::post())
-        .and(warp::body::json())
-        .and(admin_auth_check)
-        .and(scheduler_filter.clone())
-        .and(yougile_filter.clone())
-        .and_then(book_slot_handler);
-
-    let delete_slot = api
-        .and(warp::path("slots"))
-        .and(warp::path::param::<Uuid>())
-        .and(warp::path::end())
-        .and(warp::delete())
-        .and(admin_auth_required.clone())
-        .and(scheduler_filter.clone())
-        .and(yougile_filter.clone())
-        .and_then(delete_slot_handler);
-
-    let update_slot = api
-        .and(warp::path("slots"))
-        .and(warp::path::param::<Uuid>())
-        .and(warp::path::end())
-        .and(warp::put())
-        .and(warp::body::json::<CreateSlotRequest>())
-        .and(admin_auth_required.clone())
-        .and(scheduler_filter.clone())
-        .and(yougile_filter.clone())
-        .and_then(update_slot_handler);
-
-    let update_slot_full = api
-        .and(warp::path("slots"))
-        .and(warp::path::param::<Uuid>())
-        .and(warp::path("full"))
-        .and(warp::path::end())
-        .and(warp::put())
-        .and(warp::body::json::<UpdateSlotRequest>())
-        .and(admin_auth_required.clone())
-        .and(scheduler_filter.clone())
-        .and(yougile_filter.clone())
-        .and_then(update_slot_full_handler);
-
-    let get_yougile_settings = api
-        .and(warp::path("yougile"))
-        .and(warp::path("settings"))
-        .and(warp::path::end())
-        .and(warp::get())
-        .and(admin_auth_required.clone())
-        .and(yougile_filter.clone())
-        .and_then(get_yougile_settings_handler);
-
-    let update_yougile_settings = api
-        .and(warp::path("yougile"))
-        .and(warp::path("settings"))
-        .and(warp::path::end())
-        .and(warp::put())
-        .and(warp::body::json::<handlers::YougileSettings>())
-        .and(admin_auth_required.clone())
-        .and(yougile_filter.clone())
-        .and_then(update_yougile_settings_handler);
-
-    let test_yougile_connection = api
-        .and(warp::path("yougile"))
-        .and(warp::path("test"))
-        .and(warp::path::end())
-        .and(warp::post())
-        .and(admin_auth_required.clone())
-        .and(yougile_filter.clone())
-        .and_then(test_yougile_connection_handler);
-
-    let static_route = warp::path::tail().and_then(web::static_handler);
-
-    get_slots
-        .or(admin_auth)
-        .or(check_auth)
-        .or(create_slot)
-        .or(book_slot)
-        .or(delete_slot)
-        .or(update_slot)
-        .or(update_slot_full)
-        .or(get_yougile_settings)
-        .or(update_yougile_settings)
-        .or(test_yougile_connection)
-        .or(static_route)
-        .with(cors)
-        .recover(handle_rejection)
+    public_routes
+        .merge(protected_routes)
+        .layer(cors)
+        .with_state(app_state)
 }
 
-fn with_scheduler(
-    scheduler: Arc<Scheduler>,
-) -> impl Filter<Extract = (Arc<Scheduler>,), Error = std::convert::Infallible> + Clone {
-    warp::any().map(move || scheduler.clone())
+#[derive(Clone)]
+pub struct AppState {
+    pub scheduler: Arc<Scheduler>,
+    pub yougile: Arc<YougileClient>,
+    pub admin_password: String,
+    pub admin_token: AdminToken,
 }
 
-fn with_yougile(
-    yougile: Arc<YougileIntegration>,
-) -> impl Filter<Extract = (Arc<YougileIntegration>,), Error = std::convert::Infallible> + Clone {
-    warp::any().map(move || yougile.clone())
+async fn root_handler() -> impl IntoResponse {
+    static_handler(Path("index.html".to_string())).await
 }
 
-fn with_admin_password(
-    password: String,
-) -> impl Filter<Extract = (String,), Error = std::convert::Infallible> + Clone {
-    warp::any().map(move || password.clone())
-}
+async fn static_handler(Path(path): Path<String>) -> Result<Response, (StatusCode, &'static str)> {
+    let file = STATIC_DIR
+        .get_file(&path)
+        .or_else(|| STATIC_DIR.get_file("index.html"));
 
-fn with_admin_token(
-    token: AdminToken,
-) -> impl Filter<Extract = (AdminToken,), Error = std::convert::Infallible> + Clone {
-    warp::any().map(move || token.clone())
+    match file {
+        Some(file) => {
+            let actual_path = if path.is_empty() || STATIC_DIR.get_file(&path).is_none() {
+                "index.html"
+            } else {
+                &path
+            };
+
+            let content_type = match std::path::Path::new(actual_path)
+                .extension()
+                .and_then(|ext| ext.to_str())
+            {
+                Some("html") => "text/html",
+                Some("css") => "text/css",
+                Some("js") => "application/javascript",
+                _ => "application/octet-stream",
+            };
+
+            let headers = axum::http::HeaderMap::from_iter([(
+                axum::http::HeaderName::from_static("content-type"),
+                content_type.parse().unwrap(),
+            )]);
+
+            Ok((headers, axum::response::Html(file.contents())).into_response())
+        }
+        None => Err((StatusCode::NOT_FOUND, "Not Found")),
+    }
 }

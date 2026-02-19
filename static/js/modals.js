@@ -41,7 +41,7 @@ class Modals {
     EventManager.onSubmit('quickSlotForm', () => this.createQuickSlot());
     EventManager.onSubmit('bookingForm', () => this.bookSlot());
     EventManager.onSubmit('editSlotForm', () => this.updateSlot());
-    
+
     EventManager.onClick('yougileSettingsBtn', () => this.openYougileSettingsModal());
     EventManager.onClick('saveYougileSettings', () => this.saveYougileSettings());
     EventManager.onClick('testYougileConnection', () => this.testYougileConnection());
@@ -111,7 +111,7 @@ class Modals {
                                 <strong>ID компании:</strong> ${slot.booking.company_id}
                             </div>
                             <div class="col-md-6">
-                                <strong>Email для скачивания:</strong> ${slot.booking.download_email}<br>
+                                <strong>Email получателя архива:</strong> ${slot.booking.download_email}<br>
                                 <strong>Дата создания:</strong> ${new Date(slot.booking.created_at).toLocaleString()}
                             </div>
                         </div>
@@ -298,7 +298,9 @@ class Modals {
 
       DOMHelper.setChecked('yougileEnabled', settings.enabled);
       DOMHelper.set('yougileApiUrl', settings.api_url);
-      DOMHelper.set('yougileApiToken', settings.api_token);
+      if (settings.api_token !== undefined) {
+        DOMHelper.set('yougileApiToken', settings.api_token);
+      }
 
       // Store current settings and map
       this.currentYougileSettings = {
@@ -378,14 +380,14 @@ class Modals {
   populateSelect(selectId, items, valueField, textField, placeholder) {
     const select = DOMHelper.get(selectId);
     select.innerHTML = `<option value="">${placeholder}</option>`;
-    
+
     items.forEach(item => {
       const option = document.createElement('option');
       option.value = item[valueField];
       option.textContent = item[textField];
       select.appendChild(option);
     });
-    
+
     select.disabled = false;
   }
 
@@ -396,10 +398,11 @@ class Modals {
   }
 
   async saveYougileSettings() {
+    const apiTokenInput = DOMHelper.get('yougileApiToken');
+
     const settings = {
       enabled: DOMHelper.isChecked('yougileEnabled'),
       api_url: DOMHelper.get('yougileApiUrl').value,
-      api_token: DOMHelper.get('yougileApiToken').value,
       project_id: DOMHelper.get('yougileProjectId').value,
       project_title: this.getSelectText('yougileProjectId'),
       board_id: DOMHelper.get('yougileBoardId').value,
@@ -409,8 +412,13 @@ class Modals {
       projects_map: this.projectsMap || []
     };
 
+    if (apiTokenInput.value) {
+      settings.api_token = apiTokenInput.value;
+    }
+
     try {
       await this.scheduler.api.updateYougileSettings(settings);
+      apiTokenInput.value = '';
       this.hideModal('yougileSettingsModal');
     } catch (error) {
       Utils.showError('Ошибка сохранения настроек: ' + error.message);
