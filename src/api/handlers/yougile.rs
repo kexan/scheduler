@@ -50,6 +50,7 @@ pub struct YougileConfigUpdate {
     pub board_title: Option<String>,
     pub column_id: Option<String>,
     pub column_title: Option<String>,
+    pub projects_map: Option<Vec<ProjectInfo>>,
 }
 
 pub async fn get_yougile_config_handler(
@@ -91,6 +92,9 @@ pub async fn update_yougile_config_handler(
     }
     if let Some(column_title) = update.column_title {
         config.column_title = column_title;
+    }
+    if let Some(projects_map) = update.projects_map {
+        config.projects_map = projects_map;
     }
 
     state.yougile.update_config(config).await?;
