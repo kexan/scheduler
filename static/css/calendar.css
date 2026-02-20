@@ -1,33 +1,40 @@
-/* Стили для календаря */
 .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: var(--calendar-gap);
-    background-color: var(--calendar-border);
+    grid-template-rows: 32px;
+    grid-auto-rows: minmax(120px, 1fr);
+    gap: 0;
     border: 1px solid var(--calendar-border);
     border-radius: var(--calendar-radius);
     overflow: hidden;
+    width: 100%;
 }
 
 .calendar-header {
     background-color: var(--light-color);
-    padding: 10px;
-    text-align: center;
+    padding: 4px;
     font-weight: bold;
+    font-size: 0.75rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 32px;
     border-right: 1px solid var(--calendar-border);
+    border-bottom: 1px solid var(--calendar-border);
 }
 
-.calendar-header:last-child {
+.calendar-header:nth-child(7n) {
     border-right: none;
 }
 
 .calendar-day {
     background-color: white;
-    min-height: 100px;
     padding: 8px;
     position: relative;
+    min-height: 120px;
     border-right: 1px solid var(--calendar-border);
     border-bottom: 1px solid var(--calendar-border);
+    overflow: hidden;
 }
 
 .calendar-day:nth-child(7n) {
