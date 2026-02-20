@@ -154,7 +154,8 @@ async fn test_check_auth_not_authenticated() {
 async fn test_protected_route_without_auth_returns_401() {
     let app = create_test_app().await;
 
-    let response = app.clone()
+    let response = app
+        .clone()
         .oneshot(
             Request::builder()
                 .uri("/api/slots")
@@ -175,7 +176,8 @@ async fn test_protected_route_without_auth_returns_401() {
 async fn test_get_yougile_settings() {
     let app = create_test_app().await;
 
-    let response = app.clone()
+    let response = app
+        .clone()
         .oneshot(
             Request::builder()
                 .uri("/api/auth/admin")

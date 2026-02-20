@@ -46,6 +46,7 @@ pub fn routes(scheduler: Arc<Scheduler>, yougile: Arc<YougileClient>) -> Router 
         .route("/api/slots/{id}/book", post(slots::book_slot_handler))
         .route("/api/slots/{id}", delete(slots::delete_slot_handler))
         .route("/api/slots/{id}", put(slots::update_slot_handler))
+        .route("/api/slots/{id}/full", put(slots::update_slot_full_handler))
         .route(
             "/api/yougile/settings",
             get(yougile::get_yougile_config_handler),

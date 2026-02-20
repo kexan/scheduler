@@ -1,6 +1,6 @@
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::Mutex;
-use tokio::time::{Duration, timeout};
 use tracing::{error, info};
 use yougile_api_client::YouGileClient;
 use yougile_api_client::apis::configuration::Configuration;
@@ -10,10 +10,6 @@ use crate::error::{AppError, Result};
 use crate::scheduler::TimeSlot;
 use crate::yougile::config::{self, YougileConfig};
 use crate::yougile::models::{BoardInfo, ColumnInfo, ProjectInfo};
-
-//FIXME: вот это наверное надо бы вынести непосредственно в апи либу
-const YOUGILE_TIMEOUT: Duration = Duration::from_secs(10);
-const YOUGILE_LONG_TIMEOUT: Duration = Duration::from_secs(30);
 
 pub struct YougileClient {
     inner: Arc<Mutex<YougileInner>>,
@@ -66,17 +62,13 @@ impl YougileClient {
             ..Default::default()
         };
 
-        match timeout(YOUGILE_TIMEOUT, inner.client.create_task(create_task)).await {
-            Ok(Ok(result)) => {
+        match inner.client.create_task(create_task).await {
+            Ok(result) => {
                 info!("Created Yougile task {} for slot {}", result.id, slot.id);
                 Some(result.id)
             }
-            Ok(Err(e)) => {
+            Err(e) => {
                 error!("Failed to create Yougile task for slot {}: {}", slot.id, e);
-                None
-            }
-            Err(_) => {
-                error!("Timeout creating Yougile task for slot {}", slot.id);
                 None
             }
         }
@@ -101,20 +93,12 @@ impl YougileClient {
             ..Default::default()
         };
 
-        match timeout(
-            YOUGILE_TIMEOUT,
-            inner.client.update_task(task_id, update_task),
-        )
-        .await
-        {
-            Ok(Ok(_)) => {
+        match inner.client.update_task(task_id, update_task).await {
+            Ok(_) => {
                 info!("Updated Yougile task {} for slot {}", task_id, slot.id);
             }
-            Ok(Err(e)) => {
+            Err(e) => {
                 error!("Failed to update Yougile task for slot {}: {}", slot.id, e);
-            }
-            Err(_) => {
-                error!("Timeout updating Yougile task for slot {}", slot.id);
             }
         }
     }
@@ -131,20 +115,12 @@ impl YougileClient {
             ..Default::default()
         };
 
-        match timeout(
-            YOUGILE_TIMEOUT,
-            inner.client.update_task(task_id, update_task),
-        )
-        .await
-        {
-            Ok(Ok(_)) => {
+        match inner.client.update_task(task_id, update_task).await {
+            Ok(_) => {
                 info!("Deleted Yougile task {} successfully", task_id);
             }
-            Ok(Err(e)) => {
+            Err(e) => {
                 error!("Failed to delete Yougile task {}: {}", task_id, e);
-            }
-            Err(_) => {
-                error!("Timeout deleting Yougile task {}", task_id);
             }
         }
     }
@@ -156,35 +132,28 @@ impl YougileClient {
             return Err(AppError::Yougile("Integration disabled".to_string()));
         }
 
-        let projects = timeout(
-            YOUGILE_LONG_TIMEOUT,
-            inner.client.search_projects(None, Some(999.0), None, None),
-        )
-        .await
-        .map_err(|_| AppError::Yougile("Timeout loading projects".to_string()))??;
+        let projects = inner
+            .client
+            .search_projects(None, Some(999.0), None, None)
+            .await
+            .map_err(|e| AppError::Yougile(e.to_string()))?;
 
         let mut result = Vec::new();
 
         for project in projects.content {
-            let boards = timeout(
-                YOUGILE_LONG_TIMEOUT,
-                inner
-                    .client
-                    .search_boards(None, Some(999.0), None, None, Some(&project.id)),
-            )
-            .await
-            .map_err(|_| AppError::Yougile("Timeout loading boards".to_string()))??;
+            let boards = inner
+                .client
+                .search_boards(None, Some(999.0), None, None, Some(&project.id))
+                .await
+                .map_err(|e| AppError::Yougile(e.to_string()))?;
 
             let mut board_infos = Vec::new();
             for board in boards.content {
-                let columns = timeout(
-                    YOUGILE_LONG_TIMEOUT,
-                    inner
-                        .client
-                        .search_columns(None, Some(999.0), None, None, Some(&board.id)),
-                )
-                .await
-                .map_err(|_| AppError::Yougile("Timeout loading columns".to_string()))??;
+                let columns = inner
+                    .client
+                    .search_columns(None, Some(999.0), None, None, Some(&board.id))
+                    .await
+                    .map_err(|e| AppError::Yougile(e.to_string()))?;
 
                 board_infos.push(BoardInfo {
                     id: board.id,
@@ -213,7 +182,11 @@ impl YougileClient {
 
 impl YougileInner {
     fn new(config: YougileConfig) -> Result<Self> {
-        let cfg = Configuration::new(config.api_token.clone()).with_base_path(&config.api_url);
+        const YOUGILE_TIMEOUT: Duration = Duration::from_secs(10);
+
+        let cfg = Configuration::new(config.api_token.clone())
+            .with_base_path(&config.api_url)
+            .with_timeout(YOUGILE_TIMEOUT);
         let client = YouGileClient::new(cfg);
         Ok(Self { client, config })
     }
