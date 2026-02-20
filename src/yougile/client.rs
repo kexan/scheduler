@@ -5,12 +5,13 @@ use tokio::time::sleep;
 use tracing::{error, info};
 use yougile_api_client::YouGileClient;
 use yougile_api_client::apis::configuration::Configuration;
-use yougile_api_client::models::{CreateTask, UpdateTask};
+use yougile_api_client::models::tasks::UpdateDeadline;
+use yougile_api_client::models::{CreateTask, Deadline, UpdateTask};
 
 use crate::error::{AppError, Result};
 use crate::scheduler::TimeSlot;
 use crate::yougile::config::{self, YougileConfig};
-use crate::yougile::models::{BoardInfo, ColumnInfo, ProjectInfo};
+use crate::yougile::models::{BoardInfo, ColumnInfo, ProjectInfo, UserInfo};
 
 pub struct YougileClient {
     inner: Arc<Mutex<YougileInner>>,
@@ -64,7 +65,7 @@ impl YougileClient {
         let mut attempts = 0;
 
         loop {
-            let (client, column_id, enabled) = {
+            let (client, column_id, enabled, assignee) = {
                 let inner = self.inner.lock().await;
                 if !inner.config.enabled {
                     return None;
@@ -73,6 +74,7 @@ impl YougileClient {
                     inner.client.clone(),
                     inner.config.column_id.clone(),
                     inner.config.enabled,
+                    inner.config.assignee_id.clone(),
                 )
             };
 
@@ -80,10 +82,15 @@ impl YougileClient {
                 return None;
             }
 
+            let assigned = assignee.map(|id| vec![id]);
+            let deadline = build_deadline(slot);
+
             let create_task = CreateTask {
                 title: title.clone(),
                 column_id: Some(column_id),
                 description: Some(description.clone()),
+                assigned,
+                deadline: Some(deadline),
                 ..Default::default()
             };
 
@@ -122,22 +129,31 @@ impl YougileClient {
         let mut attempts = 0;
 
         loop {
-            let (client, enabled) = {
+            let (client, enabled, assignee) = {
                 let inner = self.inner.lock().await;
                 if !inner.config.enabled {
                     return;
                 }
-                (inner.client.clone(), inner.config.enabled)
+                (
+                    inner.client.clone(),
+                    inner.config.enabled,
+                    inner.config.assignee_id.clone(),
+                )
             };
 
             if !enabled {
                 return;
             }
 
+            let assigned = assignee.map(|id| vec![id]);
+            let deadline = build_update_deadline(slot);
+
             let update_task = UpdateTask {
                 title: Some(title.clone()),
                 description: Some(description.clone()),
                 completed: Some(slot.completed),
+                assigned,
+                deadline: Some(deadline),
                 ..Default::default()
             };
 
@@ -266,6 +282,36 @@ impl YougileClient {
 
         Ok(result)
     }
+
+    pub async fn load_users(&self) -> Result<Vec<UserInfo>> {
+        let inner = self.inner.lock().await;
+
+        if !inner.config.enabled {
+            return Err(AppError::Yougile("Integration disabled".to_string()));
+        }
+
+        if inner.config.project_id.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        let users = inner
+            .client
+            .search_users(Some(999.0), None, None, Some(&inner.config.project_id))
+            .await
+            .map_err(|e| AppError::Yougile(e.to_string()))?;
+
+        let result = users
+            .content
+            .into_iter()
+            .map(|u| UserInfo {
+                id: u.id,
+                email: u.email,
+                name: u.real_name,
+            })
+            .collect();
+
+        Ok(result)
+    }
 }
 
 impl YougileInner {
@@ -321,4 +367,60 @@ fn format_task_data(slot: &TimeSlot) -> (String, String) {
     };
 
     (title, description)
+}
+
+//FIXME: костыльно чето
+const MOSCOW_OFFSET_SECONDS: i32 = 3 * 60 * 60;
+use chrono::TimeZone;
+
+fn build_deadline(slot: &TimeSlot) -> Deadline {
+    let naive_datetime_start = slot.date.and_time(slot.start_time);
+    let naive_datetime_end = slot.date.and_time(slot.end_time);
+
+    let moscow_offset = chrono::FixedOffset::east_opt(MOSCOW_OFFSET_SECONDS).unwrap();
+
+    let start_dt = moscow_offset
+        .from_local_datetime(&naive_datetime_start)
+        .single()
+        .unwrap();
+    let end_dt = moscow_offset
+        .from_local_datetime(&naive_datetime_end)
+        .single()
+        .unwrap();
+
+    let start_timestamp = start_dt.timestamp_millis() as f64;
+    let end_timestamp = end_dt.timestamp_millis() as f64;
+
+    Deadline {
+        deadline: end_timestamp,
+        start_date: Some(start_timestamp),
+        with_time: Some(true),
+        ..Default::default()
+    }
+}
+
+fn build_update_deadline(slot: &TimeSlot) -> UpdateDeadline {
+    let naive_datetime_start = slot.date.and_time(slot.start_time);
+    let naive_datetime_end = slot.date.and_time(slot.end_time);
+
+    let moscow_offset = chrono::FixedOffset::east_opt(MOSCOW_OFFSET_SECONDS).unwrap();
+
+    let start_dt = moscow_offset
+        .from_local_datetime(&naive_datetime_start)
+        .single()
+        .unwrap();
+    let end_dt = moscow_offset
+        .from_local_datetime(&naive_datetime_end)
+        .single()
+        .unwrap();
+
+    let start_timestamp = start_dt.timestamp_millis() as f64;
+    let end_timestamp = end_dt.timestamp_millis() as f64;
+
+    UpdateDeadline {
+        deadline: Some(end_timestamp),
+        start_date: Some(start_timestamp),
+        with_time: Some(true),
+        ..Default::default()
+    }
 }
