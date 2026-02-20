@@ -49,6 +49,7 @@ impl Scheduler {
                 is_available: true,
                 booking: None,
                 yougile_task_id: None,
+                completed: false,
             };
 
             inner.insert(slot.id, slot.clone());
@@ -203,6 +204,10 @@ impl Scheduler {
                 slot.is_available = false;
             } else if update_time_slot.is_available == Some(false) {
                 slot.booking = None;
+            }
+
+            if let Some(completed) = update_time_slot.completed {
+                slot.completed = completed;
             }
 
             slot.clone()

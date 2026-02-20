@@ -108,8 +108,13 @@ class Calendar {
       let slotClass = '';
 
       if (!slot.is_available) {
-        content += '🔒 ';
-        slotClass = 'booked';
+        if (slot.completed) {
+          content += '✓ ';
+          slotClass = 'completed';
+        } else {
+          content += '🔒 ';
+          slotClass = 'in-progress';
+        }
       } else if (isPastDate) {
         slotClass = 'past-date-available';
       }

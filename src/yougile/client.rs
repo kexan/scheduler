@@ -1,6 +1,7 @@
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
+use tokio::time::sleep;
 use tracing::{error, info};
 use yougile_api_client::YouGileClient;
 use yougile_api_client::apis::configuration::Configuration;
@@ -18,6 +19,17 @@ pub struct YougileClient {
 struct YougileInner {
     client: YouGileClient,
     config: YougileConfig,
+}
+
+const MAX_RETRIES: u32 = 15;
+
+fn calc_backoff_delay(attempt: u32) -> Duration {
+    let base = 1000_u64;
+    let max = 2 * 60 * 60 * 1000; // 2 hours
+    let delay = base * 2u64.pow(attempt);
+    let delay = delay.min(max);
+    let jitter = (fastrand::u64(0..1000) as f64 / 1000.0 * delay as f64) as u64;
+    Duration::from_millis(delay + jitter)
 }
 
 impl YougileClient {
@@ -47,80 +59,156 @@ impl YougileClient {
     }
 
     pub async fn create_task(&self, slot: &TimeSlot) -> Option<String> {
-        let inner = self.inner.lock().await;
-
-        if !inner.config.enabled {
-            return None;
-        }
-
+        let slot_id = slot.id.to_string();
         let (title, description) = format_task_data(slot);
+        let mut attempts = 0;
 
-        let create_task = CreateTask {
-            title,
-            column_id: Some(inner.config.column_id.clone()),
-            description: Some(description),
-            ..Default::default()
-        };
+        loop {
+            let (client, column_id, enabled) = {
+                let inner = self.inner.lock().await;
+                if !inner.config.enabled {
+                    return None;
+                }
+                (
+                    inner.client.clone(),
+                    inner.config.column_id.clone(),
+                    inner.config.enabled,
+                )
+            };
 
-        match inner.client.create_task(create_task).await {
-            Ok(result) => {
-                info!("Created Yougile task {} for slot {}", result.id, slot.id);
-                Some(result.id)
+            if !enabled {
+                return None;
             }
-            Err(e) => {
-                error!("Failed to create Yougile task for slot {}: {}", slot.id, e);
-                None
+
+            let create_task = CreateTask {
+                title: title.clone(),
+                column_id: Some(column_id),
+                description: Some(description.clone()),
+                ..Default::default()
+            };
+
+            attempts += 1;
+            match client.create_task(create_task).await {
+                Ok(res) => {
+                    info!("Created Yougile task {} for slot {}", res.id, slot_id);
+                    return Some(res.id);
+                }
+                Err(e) if attempts < MAX_RETRIES => {
+                    let delay = calc_backoff_delay(attempts - 1);
+                    error!(
+                        "Retry {}/{} for create_task failed (slot_id={}): {}. Retrying in {:?}",
+                        attempts, MAX_RETRIES, slot_id, e, delay
+                    );
+                    sleep(delay).await;
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to create Yougile task for slot {} after {} attempts: {}",
+                        slot_id, attempts, e
+                    );
+                    return None;
+                }
             }
         }
     }
 
     pub async fn update_task(&self, slot: &TimeSlot) {
-        let inner = self.inner.lock().await;
-
-        if !inner.config.enabled {
-            return;
-        }
-
-        let Some(task_id) = &slot.yougile_task_id else {
-            return;
+        let task_id = match &slot.yougile_task_id {
+            Some(id) => id.clone(),
+            None => return,
         };
-
+        let slot_id = slot.id.to_string();
         let (title, description) = format_task_data(slot);
+        let mut attempts = 0;
 
-        let update_task = UpdateTask {
-            title: Some(title),
-            description: Some(description),
-            ..Default::default()
-        };
+        loop {
+            let (client, enabled) = {
+                let inner = self.inner.lock().await;
+                if !inner.config.enabled {
+                    return;
+                }
+                (inner.client.clone(), inner.config.enabled)
+            };
 
-        match inner.client.update_task(task_id, update_task).await {
-            Ok(_) => {
-                info!("Updated Yougile task {} for slot {}", task_id, slot.id);
+            if !enabled {
+                return;
             }
-            Err(e) => {
-                error!("Failed to update Yougile task for slot {}: {}", slot.id, e);
+
+            let update_task = UpdateTask {
+                title: Some(title.clone()),
+                description: Some(description.clone()),
+                completed: Some(slot.completed),
+                ..Default::default()
+            };
+
+            attempts += 1;
+            match client.update_task(&task_id, update_task).await {
+                Ok(_) => {
+                    info!("Updated Yougile task {} for slot {}", task_id, slot_id);
+                    return;
+                }
+                Err(e) if attempts < MAX_RETRIES => {
+                    let delay = calc_backoff_delay(attempts - 1);
+                    error!(
+                        "Retry {}/{} for update_task failed (task_id={}, slot_id={}): {}. Retrying in {:?}",
+                        attempts, MAX_RETRIES, task_id, slot_id, e, delay
+                    );
+                    sleep(delay).await;
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to update Yougile task {} for slot {} after {} attempts: {}",
+                        task_id, slot_id, attempts, e
+                    );
+                    return;
+                }
             }
         }
     }
 
     pub async fn delete_task(&self, task_id: &str) {
-        let inner = self.inner.lock().await;
+        let task_id = task_id.to_string();
+        let mut attempts = 0;
 
-        if !inner.config.enabled {
-            return;
-        }
+        loop {
+            let (client, enabled) = {
+                let inner = self.inner.lock().await;
+                if !inner.config.enabled {
+                    return;
+                }
+                (inner.client.clone(), inner.config.enabled)
+            };
 
-        let update_task = UpdateTask {
-            deleted: Some(true),
-            ..Default::default()
-        };
-
-        match inner.client.update_task(task_id, update_task).await {
-            Ok(_) => {
-                info!("Deleted Yougile task {} successfully", task_id);
+            if !enabled {
+                return;
             }
-            Err(e) => {
-                error!("Failed to delete Yougile task {}: {}", task_id, e);
+
+            let update_task = UpdateTask {
+                deleted: Some(true),
+                ..Default::default()
+            };
+
+            attempts += 1;
+            match client.update_task(&task_id, update_task).await {
+                Ok(_) => {
+                    info!("Deleted Yougile task {} successfully", task_id);
+                    return;
+                }
+                Err(e) if attempts < MAX_RETRIES => {
+                    let delay = calc_backoff_delay(attempts - 1);
+                    error!(
+                        "Retry {}/{} for delete_task failed (task_id={}): {}. Retrying in {:?}",
+                        attempts, MAX_RETRIES, task_id, e, delay
+                    );
+                    sleep(delay).await;
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to delete Yougile task {} after {} attempts: {}",
+                        task_id, attempts, e
+                    );
+                    return;
+                }
             }
         }
     }

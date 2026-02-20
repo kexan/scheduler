@@ -36,6 +36,7 @@ pub fn routes(scheduler: Arc<Scheduler>, yougile: Arc<YougileClient>) -> Router 
 
     let public_routes = Router::new()
         .route("/", get(root_handler))
+        .route("/favicon.ico", get(favicon_handler))
         .route("/api/slots", get(slots::get_slots_handler))
         .route("/api/auth/admin", post(auth::admin_auth_handler))
         .route("/api/auth/check", get(auth::check_auth_handler))
@@ -79,11 +80,13 @@ async fn root_handler() -> impl IntoResponse {
     static_handler(Path("index.html".to_string())).await
 }
 
-async fn static_handler(Path(path): Path<String>) -> Result<Response, (StatusCode, &'static str)> {
-    let file = STATIC_DIR
-        .get_file(&path)
-        .or_else(|| STATIC_DIR.get_file("index.html"));
+async fn favicon_handler() -> impl IntoResponse {
+    static_handler(Path("favicon.ico".to_string())).await
+}
 
+async fn static_handler(Path(path): Path<String>) -> Result<Response, (StatusCode, &'static str)> {
+    let file = STATIC_DIR.get_file(&path);
+    
     match file {
         Some(file) => {
             let actual_path = if path.is_empty() || STATIC_DIR.get_file(&path).is_none() {
@@ -92,14 +95,20 @@ async fn static_handler(Path(path): Path<String>) -> Result<Response, (StatusCod
                 &path
             };
 
-            let content_type = match std::path::Path::new(actual_path)
-                .extension()
-                .and_then(|ext| ext.to_str())
-            {
-                Some("html") => "text/html",
-                Some("css") => "text/css",
-                Some("js") => "application/javascript",
-                _ => "application/octet-stream",
+            let content_type = if actual_path.ends_with(".html") {
+                "text/html"
+            } else {
+                match std::path::Path::new(actual_path)
+                    .extension()
+                    .and_then(|ext| ext.to_str())
+                {
+                    Some("css") => "text/css",
+                    Some("js") => "application/javascript",
+                    Some("ico") => "image/x-icon",
+                    Some("png") => "image/png",
+                    Some("svg") => "image/svg+xml",
+                    _ => "application/octet-stream",
+                }
             };
 
             let headers = axum::http::HeaderMap::from_iter([(
@@ -107,7 +116,7 @@ async fn static_handler(Path(path): Path<String>) -> Result<Response, (StatusCod
                 content_type.parse().unwrap(),
             )]);
 
-            Ok((headers, axum::response::Html(file.contents())).into_response())
+            Ok((headers, axum::body::Bytes::from_static(file.contents())).into_response())
         }
         None => Err((StatusCode::NOT_FOUND, "Not Found")),
     }

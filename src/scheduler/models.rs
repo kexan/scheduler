@@ -11,6 +11,8 @@ pub struct TimeSlot {
     pub is_available: bool,
     pub booking: Option<Booking>,
     pub yougile_task_id: Option<String>,
+    #[serde(default)]
+    pub completed: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -27,6 +29,7 @@ pub struct UpdateTimeSlot {
     pub end_time: Option<NaiveTime>,
     pub is_available: Option<bool>,
     pub booking: Option<CreateBooking>,
+    pub completed: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
