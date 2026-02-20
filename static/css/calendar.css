@@ -78,7 +78,7 @@
 }
 
 .calendar-slot.available,
-.calendar-slot:not(.booked):not(.in-progress):not(.completed) {
+.calendar-slot:not(.booked):not(.in-progress):not(.completed):not(.past-date-available) {
     background-color: var(--slot-available-bg);
     color: var(--slot-available-color);
 }
