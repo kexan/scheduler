@@ -11,6 +11,7 @@ pub struct TimeSlot {
     pub is_available: bool,
     pub booking: Option<Booking>,
     pub yougile_task_id: Option<String>,
+    #[serde(default)]
     pub completed: bool,
 }
 
