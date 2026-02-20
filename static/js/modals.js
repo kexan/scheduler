@@ -87,15 +87,21 @@ class Modals {
     const slot = this.scheduler.slots.find(s => s.id === slotId);
     if (!slot) return;
 
+    let statusText;
+    if (slot.is_available) {
+      statusText = 'Доступен';
+    } else if (slot.completed) {
+      statusText = 'Выполнен';
+    } else {
+      statusText = 'Забронирован';
+    }
+
     let html = `
-            <div class="mb-3">
-                <strong>ID слота:</strong> ${slot.id}
-            </div>
             <div class="mb-3">
                 <strong>Дата и время:</strong> ${Utils.formatDateTimeMSK(slot.date, slot.start_time)} - ${Utils.formatTime(slot.end_time)}
             </div>
             <div class="mb-3">
-                <strong>Статус:</strong> ${slot.is_available ? 'Доступен' : 'Забронирован'}
+                <strong>Статус:</strong> ${statusText}
             </div>
         `;
 
@@ -166,6 +172,15 @@ class Modals {
     DOMHelper.set('editSlotStartTime', slot.start_time);
     DOMHelper.set('editSlotEndTime', slot.end_time);
 
+    if (slot.yougile_task_id) {
+      DOMHelper.text('editYougileTaskIdDisplay', slot.yougile_task_id);
+      DOMHelper.show('editYougileTaskContainer');
+      DOMHelper.show('editCompletedContainer');
+      DOMHelper.setChecked('editCompleted', slot.completed || false);
+    } else {
+      DOMHelper.hide('editYougileTaskContainer');
+      DOMHelper.hide('editCompletedContainer');
+    }
 
     if (slot.booking) {
       DOMHelper.set('editCompanyName', slot.booking.company_name || '');
@@ -254,6 +269,11 @@ class Modals {
     } else {
       slotData.is_available = true;
       slotData.booking = null;
+    }
+
+    const completedContainer = DOMHelper.get('editCompletedContainer');
+    if (completedContainer && completedContainer.style.display !== 'none') {
+      slotData.completed = DOMHelper.isChecked('editCompleted');
     }
 
     const result = await this.scheduler.api.updateSlot(slotId, slotData);

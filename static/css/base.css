@@ -13,9 +13,13 @@
     --calendar-border: #dee2e6;
     --calendar-radius: 8px;
     
-    --slot-available-bg: #d4edda;
-    --slot-available-hover: #c3e6cb;
+    --slot-available-bg: #6ea8fe;
+    --slot-available-hover: #4d9cff;
+    --slot-available-color: #ffffff;
     --slot-booked-bg: #f8d7da;
+    --slot-in-progress-bg: #fff3cd;
+    --slot-completed-bg: #28a745;
+    --slot-completed-color: #ffffff;
     --slot-past-available-bg: #e9ecef;
     --slot-past-available-hover: #dee2e6;
     --slot-more-bg: #fff3cd;

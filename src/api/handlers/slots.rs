@@ -31,6 +31,7 @@ pub struct UpdateSlotRequest {
     pub end_time: NaiveTime,
     pub is_available: Option<bool>,
     pub booking: Option<CreateBookingRequest>,
+    pub completed: Option<bool>,
 }
 
 pub async fn get_slots_handler(
@@ -157,6 +158,7 @@ pub async fn update_slot_full_handler(
             company_id: b.company_id,
             download_email: b.download_email,
         }),
+        completed: request.completed,
     };
     let slot = state
         .scheduler

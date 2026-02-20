@@ -928,6 +928,7 @@ dependencies = [
  "chrono",
  "clap",
  "env_logger",
+ "fastrand",
  "include_dir",
  "log",
  "serde",

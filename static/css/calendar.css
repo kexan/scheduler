@@ -77,8 +77,23 @@
     background-color: var(--slot-available-hover);
 }
 
+.calendar-slot.available,
+.calendar-slot:not(.booked):not(.in-progress):not(.completed) {
+    background-color: var(--slot-available-bg);
+    color: var(--slot-available-color);
+}
+
 .calendar-slot.booked {
     background-color: var(--slot-booked-bg);
+}
+
+.calendar-slot.in-progress {
+    background-color: var(--slot-in-progress-bg);
+}
+
+.calendar-slot.completed {
+    background-color: var(--slot-completed-bg);
+    color: var(--slot-completed-color);
 }
 
 .calendar-slot.past-date-available {
@@ -101,13 +116,13 @@
 }
 
 .calendar-slot.admin-add-slot {
-    background-color: var(--slot-admin-bg);
-    color: #004085;
+    background-color: #a8e6cf !important;
+    color: #155724 !important;
     font-weight: bold;
     text-align: center;
     font-size: 1.2em;
 }
 
 .calendar-slot.admin-add-slot:hover {
-    background-color: var(--slot-admin-hover);
+    background-color: #8cdbb8 !important;
 }
