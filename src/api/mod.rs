@@ -38,13 +38,13 @@ pub fn routes(scheduler: Arc<Scheduler>, yougile: Arc<YougileClient>) -> Router 
         .route("/", get(root_handler))
         .route("/favicon.ico", get(favicon_handler))
         .route("/api/slots", get(slots::get_slots_handler))
+        .route("/api/slots/{id}/book", post(slots::book_slot_handler))
         .route("/api/auth/admin", post(auth::admin_auth_handler))
         .route("/api/auth/check", get(auth::check_auth_handler))
         .route("/{*path}", get(static_handler));
 
     let protected_routes = Router::new()
         .route("/api/slots", post(slots::create_slot_handler))
-        .route("/api/slots/{id}/book", post(slots::book_slot_handler))
         .route("/api/slots/{id}", delete(slots::delete_slot_handler))
         .route("/api/slots/{id}", put(slots::update_slot_handler))
         .route("/api/slots/{id}/full", put(slots::update_slot_full_handler))
@@ -59,6 +59,10 @@ pub fn routes(scheduler: Arc<Scheduler>, yougile: Arc<YougileClient>) -> Router 
         .route(
             "/api/yougile/test",
             post(yougile::test_yougile_connection_handler),
+        )
+        .route(
+            "/api/yougile/users",
+            post(yougile::load_yougile_users_handler),
         )
         .layer(from_fn_with_state(app_state.clone(), auth_middleware));
 
@@ -86,7 +90,7 @@ async fn favicon_handler() -> impl IntoResponse {
 
 async fn static_handler(Path(path): Path<String>) -> Result<Response, (StatusCode, &'static str)> {
     let file = STATIC_DIR.get_file(&path);
-    
+
     match file {
         Some(file) => {
             let actual_path = if path.is_empty() || STATIC_DIR.get_file(&path).is_none() {

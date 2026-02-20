@@ -1,5 +1,5 @@
 use crate::error::AppError;
-use crate::yougile::models::ProjectInfo;
+use crate::yougile::models::{ProjectInfo, UserInfo};
 use crate::{api::AppState, yougile::YougileConfig};
 use axum::{Json, extract::State, http::StatusCode};
 use serde::{Deserialize, Serialize};
@@ -21,6 +21,12 @@ pub struct YougileConfigResponse {
     pub column_title: String,
     #[serde(default)]
     pub projects_map: Vec<ProjectInfo>,
+    #[serde(default)]
+    pub users_map: Vec<UserInfo>,
+    #[serde(default)]
+    pub assignee_id: Option<String>,
+    #[serde(default)]
+    pub assignee_name: Option<String>,
 }
 
 impl From<YougileConfig> for YougileConfigResponse {
@@ -35,6 +41,9 @@ impl From<YougileConfig> for YougileConfigResponse {
             column_id: config.column_id,
             column_title: config.column_title,
             projects_map: config.projects_map,
+            users_map: config.users_map,
+            assignee_id: config.assignee_id,
+            assignee_name: config.assignee_name,
         }
     }
 }
@@ -51,6 +60,9 @@ pub struct YougileConfigUpdate {
     pub column_id: Option<String>,
     pub column_title: Option<String>,
     pub projects_map: Option<Vec<ProjectInfo>>,
+    pub users_map: Option<Vec<UserInfo>>,
+    pub assignee_id: Option<String>,
+    pub assignee_name: Option<String>,
 }
 
 pub async fn get_yougile_config_handler(
@@ -96,6 +108,15 @@ pub async fn update_yougile_config_handler(
     if let Some(projects_map) = update.projects_map {
         config.projects_map = projects_map;
     }
+    if let Some(users_map) = update.users_map {
+        config.users_map = users_map;
+    }
+    if let Some(assignee_id) = update.assignee_id {
+        config.assignee_id = Some(assignee_id);
+    }
+    if let Some(assignee_name) = update.assignee_name {
+        config.assignee_name = Some(assignee_name);
+    }
 
     state.yougile.update_config(config).await?;
     info!("Yougile settings updated successfully");
@@ -110,15 +131,41 @@ pub async fn test_yougile_connection_handler(
         AppError::Yougile(e.to_string())
     })?;
 
+    let mut config = state.yougile.config().await;
+    config.projects_map = projects_map.clone();
+    state.yougile.update_config(config).await?;
+
     info!(
         "Yougile connection test successful, loaded {} projects",
         projects_map.len()
     );
 
-    //FIXME: надо на фронте переделать чтобы ожидалась просто projects_map, без всяких success
     Ok(Json(json!({
         "success": true,
         "message": format!("Connection successful, loaded {} projects", projects_map.len()),
         "projects_map": projects_map
     })))
+}
+
+pub async fn load_yougile_users_handler(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<UserInfo>>, AppError> {
+    let config = state.yougile.config().await;
+
+    if config.project_id.is_empty() {
+        return Err(AppError::Yougile("Project not selected".to_string()));
+    }
+
+    let users_map = state.yougile.load_users().await?;
+
+    let mut config = state.yougile.config().await;
+    config.users_map = users_map.clone();
+    state.yougile.update_config(config).await?;
+
+    info!(
+        "Yougile users loaded successfully, loaded {} users",
+        users_map.len()
+    );
+
+    Ok(Json(users_map))
 }

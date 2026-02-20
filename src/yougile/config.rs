@@ -4,7 +4,7 @@ use std::path::Path;
 use tokio::fs::{create_dir_all, read_to_string, write};
 
 use crate::error::{AppError, Result};
-use crate::yougile::models::ProjectInfo;
+use crate::yougile::models::{ProjectInfo, UserInfo};
 
 const SETTINGS_PATH: &str = "data/yougile_config.json";
 
@@ -25,6 +25,12 @@ pub struct YougileConfig {
     pub column_title: String,
     #[serde(default)]
     pub projects_map: Vec<ProjectInfo>,
+    #[serde(default)]
+    pub users_map: Vec<UserInfo>,
+    #[serde(default)]
+    pub assignee_id: Option<String>,
+    #[serde(default)]
+    pub assignee_name: Option<String>,
 }
 
 impl Default for YougileConfig {
@@ -40,6 +46,9 @@ impl Default for YougileConfig {
             column_id: String::new(),
             column_title: String::new(),
             projects_map: Vec::new(),
+            users_map: Vec::new(),
+            assignee_id: None,
+            assignee_name: None,
         }
     }
 }

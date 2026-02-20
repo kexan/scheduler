@@ -197,4 +197,23 @@ class Api {
     }
   }
 
+  async loadYougileUsers() {
+    try {
+      const response = await fetch(`${this.baseUrl}/yougile/users`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        return await response.json();
+      } else {
+        const error = await response.json();
+        throw new Error(error.error || 'Ошибка загрузки пользователей');
+      }
+    } catch (error) {
+      Utils.showError('Ошибка сети: ' + error.message);
+      throw error;
+    }
+  }
+
 }

@@ -45,8 +45,10 @@ class Modals {
     EventManager.onClick('yougileSettingsBtn', () => this.openYougileSettingsModal());
     EventManager.onClick('saveYougileSettings', () => this.saveYougileSettings());
     EventManager.onClick('testYougileConnection', () => this.testYougileConnection());
+    EventManager.onClick('loadYougileUsers', () => this.loadYougileUsers());
     EventManager.onChange('yougileProjectId', () => this.onProjectChange());
     EventManager.onChange('yougileBoardId', () => this.onBoardChange());
+    EventManager.onChange('yougileAssigneeId', () => this.onAssigneeChange());
   }
 
   openBookingModal(slotId) {
@@ -326,13 +328,17 @@ class Modals {
       this.currentYougileSettings = {
         project_id: settings.project_id,
         board_id: settings.board_id,
-        column_id: settings.column_id
+        column_id: settings.column_id,
+        assignee_id: settings.assignee_id,
+        assignee_name: settings.assignee_name
       };
       this.projectsMap = settings.projects_map || [];
+      this.usersMap = settings.users_map || [];
 
       if (this.projectsMap.length > 0) {
         // Map exists - populate all dropdowns
         this.populateYougileDropdownsFromMap();
+        this.updateYougileUsersSection();
         DOMHelper.html('connectionResult', '<div class="alert alert-success">Данные загружены. Нажмите "Проверить подключение" для обновления.</div>');
       } else {
         // No map - show placeholder
@@ -397,6 +403,78 @@ class Modals {
     }
   }
 
+  updateYougileUsersSection() {
+    const projectSelect = DOMHelper.get('yougileProjectId');
+    const loadUsersSection = DOMHelper.get('loadUsersSection');
+    const assigneeSection = DOMHelper.get('assigneeSection');
+    const projectId = projectSelect.value;
+
+    if (projectId) {
+      loadUsersSection.style.display = 'block';
+      
+      if (this.usersMap && this.usersMap.length > 0) {
+        assigneeSection.style.display = 'block';
+        this.populateSelect('yougileAssigneeId', this.usersMap, 'id', 'name', 'Выберите исполнителя');
+        
+        // Restore selected assignee
+        if (this.currentYougileSettings.assignee_id) {
+          const assigneeSelect = DOMHelper.get('yougileAssigneeId');
+          assigneeSelect.value = this.currentYougileSettings.assignee_id;
+        }
+      } else {
+        assigneeSection.style.display = 'none';
+      }
+    } else {
+      loadUsersSection.style.display = 'none';
+      assigneeSection.style.display = 'none';
+    }
+  }
+
+  async loadYougileUsers() {
+    DOMHelper.html('usersLoadResult', '<div class="spinner-border spinner-border-sm me-2"></div>Загрузка пользователей...');
+
+    try {
+      const users = await this.scheduler.api.loadYougileUsers();
+
+      if (users && users.length > 0) {
+        this.usersMap = users;
+        
+        // Show assignee dropdown
+        const assigneeSection = DOMHelper.get('assigneeSection');
+        assigneeSection.style.display = 'block';
+        this.populateSelect('yougileAssigneeId', this.usersMap, 'id', 'name', 'Выберите исполнителя');
+        
+        DOMHelper.html('usersLoadResult', `
+          <div class="alert alert-success">
+            <strong>✅ Пользователи загружены!</strong><br>
+            Всего: ${this.usersMap.length}
+          </div>
+        `);
+      } else {
+        DOMHelper.html('usersLoadResult', `
+          <div class="alert alert-warning">
+            <strong>⚠️ Нет пользователей</strong><br>
+            В проекте нет пользователей
+          </div>
+        `);
+      }
+    } catch (error) {
+      DOMHelper.html('usersLoadResult', `
+        <div class="alert alert-danger">
+          <strong>❌ Ошибка</strong><br>
+          ${error.message}
+        </div>
+      `);
+    }
+  }
+
+  onAssigneeChange() {
+    // Just update current settings for save
+    const assigneeSelect = DOMHelper.get('yougileAssigneeId');
+    this.currentYougileSettings.assignee_id = assigneeSelect.value;
+    this.currentYougileSettings.assignee_name = this.getSelectText('yougileAssigneeId');
+  }
+
   populateSelect(selectId, items, valueField, textField, placeholder) {
     const select = DOMHelper.get(selectId);
     select.innerHTML = `<option value="">${placeholder}</option>`;
@@ -419,6 +497,9 @@ class Modals {
 
   async saveYougileSettings() {
     const apiTokenInput = DOMHelper.get('yougileApiToken');
+    const assigneeSelect = DOMHelper.get('yougileAssigneeId');
+    const assigneeId = assigneeSelect.value;
+    const assigneeName = assigneeSelect.options[assigneeSelect.selectedIndex]?.text || '';
 
     const settings = {
       enabled: DOMHelper.isChecked('yougileEnabled'),
@@ -429,7 +510,10 @@ class Modals {
       board_title: this.getSelectText('yougileBoardId'),
       column_id: DOMHelper.get('yougileColumnId').value,
       column_title: this.getSelectText('yougileColumnId'),
-      projects_map: this.projectsMap || []
+      projects_map: this.projectsMap || [],
+      users_map: this.usersMap || [],
+      assignee_id: assigneeId || null,
+      assignee_name: assigneeId ? assigneeName : null
     };
 
     if (apiTokenInput.value) {
@@ -493,6 +577,14 @@ class Modals {
         columnSelect.innerHTML = '<option value="">Выберите колонку</option>';
         columnSelect.disabled = true;
       }
+      
+      // Show load users section
+      const loadUsersSection = DOMHelper.get('loadUsersSection');
+      loadUsersSection.style.display = 'block';
+      
+      // Hide assignee dropdown until users are loaded
+      const assigneeSection = DOMHelper.get('assigneeSection');
+      assigneeSection.style.display = 'none';
     } else {
       // Reset board and column dropdowns
       const boardSelect = DOMHelper.get('yougileBoardId');
@@ -501,6 +593,12 @@ class Modals {
       columnSelect.innerHTML = '<option value="">Сначала выберите доску</option>';
       boardSelect.disabled = true;
       columnSelect.disabled = true;
+      
+      // Hide users sections
+      const loadUsersSection = DOMHelper.get('loadUsersSection');
+      const assigneeSection = DOMHelper.get('assigneeSection');
+      loadUsersSection.style.display = 'none';
+      assigneeSection.style.display = 'none';
     }
   }
 
