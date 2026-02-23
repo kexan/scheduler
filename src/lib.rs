@@ -1,7 +1,7 @@
 pub mod api;
-pub mod cli;
 pub mod error;
 pub mod scheduler;
+pub mod utils;
 pub mod web;
 pub mod yougile;
 

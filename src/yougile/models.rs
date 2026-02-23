@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ColumnInfo {
+pub struct ProjectInfo {
     pub id: String,
     pub title: String,
 }
@@ -10,14 +10,12 @@ pub struct ColumnInfo {
 pub struct BoardInfo {
     pub id: String,
     pub title: String,
-    pub columns: Vec<ColumnInfo>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ProjectInfo {
+pub struct ColumnInfo {
     pub id: String,
     pub title: String,
-    pub boards: Vec<BoardInfo>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

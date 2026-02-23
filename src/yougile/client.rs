@@ -72,7 +72,7 @@ impl YougileClient {
                 }
                 (
                     inner.client.clone(),
-                    inner.config.column_id.clone(),
+                    inner.config.column_id.clone().unwrap_or_default(),
                     inner.config.enabled,
                     inner.config.assignee_id.clone(),
                 )
@@ -87,7 +87,11 @@ impl YougileClient {
 
             let create_task = CreateTask {
                 title: title.clone(),
-                column_id: Some(column_id),
+                column_id: if column_id.is_empty() {
+                    None
+                } else {
+                    Some(column_id)
+                },
                 description: Some(description.clone()),
                 assigned,
                 deadline: Some(deadline),
@@ -229,7 +233,7 @@ impl YougileClient {
         }
     }
 
-    pub async fn load_full_map(&self) -> Result<Vec<ProjectInfo>> {
+    pub async fn load_projects(&self) -> Result<Vec<ProjectInfo>> {
         let inner = self.inner.lock().await;
 
         if !inner.config.enabled {
@@ -242,61 +246,72 @@ impl YougileClient {
             .await
             .map_err(|e| AppError::Yougile(e.to_string()))?;
 
-        let mut result = Vec::new();
-
-        for project in projects.content {
-            let boards = inner
-                .client
-                .search_boards(None, Some(999.0), None, None, Some(&project.id))
-                .await
-                .map_err(|e| AppError::Yougile(e.to_string()))?;
-
-            let mut board_infos = Vec::new();
-            for board in boards.content {
-                let columns = inner
-                    .client
-                    .search_columns(None, Some(999.0), None, None, Some(&board.id))
-                    .await
-                    .map_err(|e| AppError::Yougile(e.to_string()))?;
-
-                board_infos.push(BoardInfo {
-                    id: board.id,
-                    title: board.title,
-                    columns: columns
-                        .content
-                        .into_iter()
-                        .map(|c| ColumnInfo {
-                            id: c.id,
-                            title: c.title,
-                        })
-                        .collect(),
-                });
-            }
-
-            result.push(ProjectInfo {
-                id: project.id,
-                title: project.title,
-                boards: board_infos,
-            });
-        }
-
-        Ok(result)
+        Ok(projects
+            .content
+            .into_iter()
+            .map(|p| ProjectInfo {
+                id: p.id,
+                title: p.title,
+            })
+            .collect())
     }
 
-    pub async fn load_users(&self) -> Result<Vec<UserInfo>> {
+    pub async fn load_boards(&self, project_id: &str) -> Result<Vec<BoardInfo>> {
         let inner = self.inner.lock().await;
 
         if !inner.config.enabled {
             return Err(AppError::Yougile("Integration disabled".to_string()));
         }
 
-        if inner.config.project_id.is_empty() {
-            return Ok(Vec::new());
+        let boards = inner
+            .client
+            .search_boards(None, Some(999.0), None, None, Some(project_id))
+            .await
+            .map_err(|e| AppError::Yougile(e.to_string()))?;
+
+        Ok(boards
+            .content
+            .into_iter()
+            .map(|b| BoardInfo {
+                id: b.id,
+                title: b.title,
+            })
+            .collect())
+    }
+
+    pub async fn load_columns(&self, board_id: &str) -> Result<Vec<ColumnInfo>> {
+        let inner = self.inner.lock().await;
+
+        if !inner.config.enabled {
+            return Err(AppError::Yougile("Integration disabled".to_string()));
+        }
+
+        let columns = inner
+            .client
+            .search_columns(None, Some(999.0), None, None, Some(board_id))
+            .await
+            .map_err(|e| AppError::Yougile(e.to_string()))?;
+
+        Ok(columns
+            .content
+            .into_iter()
+            .map(|c| ColumnInfo {
+                id: c.id,
+                title: c.title,
+            })
+            .collect())
+    }
+
+    pub async fn load_users(&self, project_id: &str) -> Result<Vec<UserInfo>> {
+        let inner = self.inner.lock().await;
+
+        if !inner.config.enabled {
+            return Err(AppError::Yougile("Integration disabled".to_string()));
         }
 
         let users = inner
             .client
-            .search_users(Some(999.0), None, None, Some(&inner.config.project_id))
+            .search_users(Some(999.0), None, None, Some(project_id))
             .await
             .map_err(|e| AppError::Yougile(e.to_string()))?;
 
@@ -318,7 +333,7 @@ impl YougileInner {
     fn new(config: YougileConfig) -> Result<Self> {
         const YOUGILE_TIMEOUT: Duration = Duration::from_secs(10);
 
-        let cfg = Configuration::new(config.api_token.clone())
+        let cfg = Configuration::new(config.api_token.clone().unwrap_or_default())
             .with_base_path(&config.api_url)
             .with_timeout(YOUGILE_TIMEOUT);
         let client = YouGileClient::new(cfg);
@@ -373,24 +388,27 @@ fn format_task_data(slot: &TimeSlot) -> (String, String) {
 const MOSCOW_OFFSET_SECONDS: i32 = 3 * 60 * 60;
 use chrono::TimeZone;
 
-fn build_deadline(slot: &TimeSlot) -> Deadline {
-    let naive_datetime_start = slot.date.and_time(slot.start_time);
-    let naive_datetime_end = slot.date.and_time(slot.end_time);
-
+/// Returns `(start_timestamp_ms, end_timestamp_ms)` in Moscow time as f64.
+fn slot_to_timestamps(slot: &TimeSlot) -> (f64, f64) {
     let moscow_offset = chrono::FixedOffset::east_opt(MOSCOW_OFFSET_SECONDS).unwrap();
 
     let start_dt = moscow_offset
-        .from_local_datetime(&naive_datetime_start)
+        .from_local_datetime(&slot.date.and_time(slot.start_time))
         .single()
         .unwrap();
     let end_dt = moscow_offset
-        .from_local_datetime(&naive_datetime_end)
+        .from_local_datetime(&slot.date.and_time(slot.end_time))
         .single()
         .unwrap();
 
-    let start_timestamp = start_dt.timestamp_millis() as f64;
-    let end_timestamp = end_dt.timestamp_millis() as f64;
+    (
+        start_dt.timestamp_millis() as f64,
+        end_dt.timestamp_millis() as f64,
+    )
+}
 
+fn build_deadline(slot: &TimeSlot) -> Deadline {
+    let (start_timestamp, end_timestamp) = slot_to_timestamps(slot);
     Deadline {
         deadline: end_timestamp,
         start_date: Some(start_timestamp),
@@ -400,23 +418,7 @@ fn build_deadline(slot: &TimeSlot) -> Deadline {
 }
 
 fn build_update_deadline(slot: &TimeSlot) -> UpdateDeadline {
-    let naive_datetime_start = slot.date.and_time(slot.start_time);
-    let naive_datetime_end = slot.date.and_time(slot.end_time);
-
-    let moscow_offset = chrono::FixedOffset::east_opt(MOSCOW_OFFSET_SECONDS).unwrap();
-
-    let start_dt = moscow_offset
-        .from_local_datetime(&naive_datetime_start)
-        .single()
-        .unwrap();
-    let end_dt = moscow_offset
-        .from_local_datetime(&naive_datetime_end)
-        .single()
-        .unwrap();
-
-    let start_timestamp = start_dt.timestamp_millis() as f64;
-    let end_timestamp = end_dt.timestamp_millis() as f64;
-
+    let (start_timestamp, end_timestamp) = slot_to_timestamps(slot);
     UpdateDeadline {
         deadline: Some(end_timestamp),
         start_date: Some(start_timestamp),

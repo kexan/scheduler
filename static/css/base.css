@@ -8,11 +8,11 @@
     --info-color: #17a2b8;
     --light-color: #f8f9fa;
     --dark-color: #343a40;
-    
+
     --calendar-gap: 1px;
     --calendar-border: #dee2e6;
     --calendar-radius: 8px;
-    
+
     --slot-available-bg: #6ea8fe;
     --slot-available-hover: #4d9cff;
     --slot-available-color: #ffffff;
@@ -20,14 +20,13 @@
     --slot-in-progress-bg: #fff3cd;
     --slot-completed-bg: #28a745;
     --slot-completed-color: #ffffff;
+    --other-month-bg: #eef0f2;
     --slot-past-available-bg: #e9ecef;
     --slot-past-available-hover: #dee2e6;
-    --slot-more-bg: #fff3cd;
-    --slot-more-hover: #ffeaa7;
     --slot-admin-bg: #cce5ff;
     --slot-admin-hover: #99d6ff;
-    
-    --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+
+    --font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
     --body-bg: #f5f5f5;
 }
 
@@ -45,7 +44,7 @@ body {
 /* Стили для предупреждения о часовом поясе */
 .timezone-alert {
     border-radius: 0;
-    margin-top: -1rem;
+    margin-top: 0;
     margin-bottom: 0.5rem;
     border-left: none;
     border-right: none;
@@ -74,7 +73,7 @@ body {
 
 .admin-copy-panel .card {
     border: 1px solid #dee2e6;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .day-checkbox {
@@ -118,9 +117,23 @@ body {
 
 /* Анимация трясения для неверного пароля */
 @keyframes shake {
-    0%, 100% { transform: translateX(0); }
-    10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
-    20%, 40%, 60%, 80% { transform: translateX(5px); }
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+    10%,
+    30%,
+    50%,
+    70%,
+    90% {
+        transform: translateX(-5px);
+    }
+    20%,
+    40%,
+    60%,
+    80% {
+        transform: translateX(5px);
+    }
 }
 
 .shake {

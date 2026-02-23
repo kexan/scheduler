@@ -1,32 +1,22 @@
 use crate::error::AppError;
-use crate::yougile::models::{ProjectInfo, UserInfo};
+use crate::yougile::models::{BoardInfo, ColumnInfo, ProjectInfo, UserInfo};
 use crate::{api::AppState, yougile::YougileConfig};
-use axum::{Json, extract::State, http::StatusCode};
+use axum::{
+    Json,
+    extract::{Query, State},
+    http::StatusCode,
+};
 use serde::{Deserialize, Serialize};
-use serde_json::json;
-use tracing::{error, info};
+use tracing::info;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize)]
 pub struct YougileConfigResponse {
     pub enabled: bool,
     pub api_url: String,
-    pub project_id: String,
-    #[serde(default)]
-    pub project_title: String,
-    pub board_id: String,
-    #[serde(default)]
-    pub board_title: String,
-    pub column_id: String,
-    #[serde(default)]
-    pub column_title: String,
-    #[serde(default)]
-    pub projects_map: Vec<ProjectInfo>,
-    #[serde(default)]
-    pub users_map: Vec<UserInfo>,
-    #[serde(default)]
+    pub project_id: Option<String>,
+    pub board_id: Option<String>,
+    pub column_id: Option<String>,
     pub assignee_id: Option<String>,
-    #[serde(default)]
-    pub assignee_name: Option<String>,
 }
 
 impl From<YougileConfig> for YougileConfigResponse {
@@ -35,137 +25,89 @@ impl From<YougileConfig> for YougileConfigResponse {
             enabled: config.enabled,
             api_url: config.api_url,
             project_id: config.project_id,
-            project_title: config.project_title,
             board_id: config.board_id,
-            board_title: config.board_title,
             column_id: config.column_id,
-            column_title: config.column_title,
-            projects_map: config.projects_map,
-            users_map: config.users_map,
             assignee_id: config.assignee_id,
-            assignee_name: config.assignee_name,
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct YougileConfigUpdate {
-    pub enabled: Option<bool>,
-    pub api_url: Option<String>,
-    pub api_token: Option<String>,
-    pub project_id: Option<String>,
-    pub project_title: Option<String>,
-    pub board_id: Option<String>,
-    pub board_title: Option<String>,
-    pub column_id: Option<String>,
-    pub column_title: Option<String>,
-    pub projects_map: Option<Vec<ProjectInfo>>,
-    pub users_map: Option<Vec<UserInfo>>,
-    pub assignee_id: Option<String>,
-    pub assignee_name: Option<String>,
+#[derive(Deserialize)]
+pub struct BoardsQuery {
+    pub project_id: String,
+}
+
+#[derive(Deserialize)]
+pub struct ColumnsQuery {
+    pub board_id: String,
+}
+
+#[derive(Deserialize)]
+pub struct UsersQuery {
+    pub project_id: String,
 }
 
 pub async fn get_yougile_config_handler(
     State(state): State<AppState>,
-) -> Result<Json<YougileConfigResponse>, AppError> {
-    let config = state.yougile.config().await;
-    Ok(Json(config.into()))
+) -> Json<YougileConfigResponse> {
+    Json(state.yougile.config().await.into())
 }
 
 pub async fn update_yougile_config_handler(
     State(state): State<AppState>,
-    Json(update): Json<YougileConfigUpdate>,
+    Json(mut new_config): Json<YougileConfig>,
 ) -> Result<StatusCode, AppError> {
-    let mut config = state.yougile.config().await;
-
-    if let Some(enabled) = update.enabled {
-        config.enabled = enabled;
+    if new_config.api_token.is_none() {
+        new_config.api_token = state.yougile.config().await.api_token;
     }
-    if let Some(api_url) = update.api_url {
-        config.api_url = api_url;
-    }
-    if let Some(api_token) = update.api_token {
-        config.api_token = api_token;
-    }
-    if let Some(project_id) = update.project_id {
-        config.project_id = project_id;
-    }
-    if let Some(project_title) = update.project_title {
-        config.project_title = project_title;
-    }
-    if let Some(board_id) = update.board_id {
-        config.board_id = board_id;
-    }
-    if let Some(board_title) = update.board_title {
-        config.board_title = board_title;
-    }
-    if let Some(column_id) = update.column_id {
-        config.column_id = column_id;
-    }
-    if let Some(column_title) = update.column_title {
-        config.column_title = column_title;
-    }
-    if let Some(projects_map) = update.projects_map {
-        config.projects_map = projects_map;
-    }
-    if let Some(users_map) = update.users_map {
-        config.users_map = users_map;
-    }
-    if let Some(assignee_id) = update.assignee_id {
-        config.assignee_id = Some(assignee_id);
-    }
-    if let Some(assignee_name) = update.assignee_name {
-        config.assignee_name = Some(assignee_name);
-    }
-
-    state.yougile.update_config(config).await?;
+    state.yougile.update_config(new_config).await?;
     info!("Yougile settings updated successfully");
     Ok(StatusCode::OK)
 }
 
-pub async fn test_yougile_connection_handler(
+pub async fn get_projects_handler(
     State(state): State<AppState>,
-) -> Result<Json<serde_json::Value>, AppError> {
-    let projects_map = state.yougile.load_full_map().await.map_err(|e| {
-        error!("Yougile connection test failed: {}", e);
-        AppError::Yougile(e.to_string())
-    })?;
-
-    let mut config = state.yougile.config().await;
-    config.projects_map = projects_map.clone();
-    state.yougile.update_config(config).await?;
-
-    info!(
-        "Yougile connection test successful, loaded {} projects",
-        projects_map.len()
-    );
-
-    Ok(Json(json!({
-        "success": true,
-        "message": format!("Connection successful, loaded {} projects", projects_map.len()),
-        "projects_map": projects_map
-    })))
+) -> Result<Json<Vec<ProjectInfo>>, AppError> {
+    let projects = state.yougile.load_projects().await?;
+    info!("Loaded {} Yougile projects", projects.len());
+    Ok(Json(projects))
 }
 
-pub async fn load_yougile_users_handler(
+pub async fn get_boards_handler(
     State(state): State<AppState>,
-) -> Result<Json<Vec<UserInfo>>, AppError> {
-    let config = state.yougile.config().await;
-
-    if config.project_id.is_empty() {
-        return Err(AppError::Yougile("Project not selected".to_string()));
-    }
-
-    let users_map = state.yougile.load_users().await?;
-
-    let mut config = state.yougile.config().await;
-    config.users_map = users_map.clone();
-    state.yougile.update_config(config).await?;
-
+    Query(query): Query<BoardsQuery>,
+) -> Result<Json<Vec<BoardInfo>>, AppError> {
+    let boards = state.yougile.load_boards(&query.project_id).await?;
     info!(
-        "Yougile users loaded successfully, loaded {} users",
-        users_map.len()
+        "Loaded {} Yougile boards for project {}",
+        boards.len(),
+        query.project_id
     );
+    Ok(Json(boards))
+}
 
-    Ok(Json(users_map))
+pub async fn get_columns_handler(
+    State(state): State<AppState>,
+    Query(query): Query<ColumnsQuery>,
+) -> Result<Json<Vec<ColumnInfo>>, AppError> {
+    let columns = state.yougile.load_columns(&query.board_id).await?;
+    info!(
+        "Loaded {} Yougile columns for board {}",
+        columns.len(),
+        query.board_id
+    );
+    Ok(Json(columns))
+}
+
+pub async fn get_users_handler(
+    State(state): State<AppState>,
+    Query(query): Query<UsersQuery>,
+) -> Result<Json<Vec<UserInfo>>, AppError> {
+    let users = state.yougile.load_users(&query.project_id).await?;
+    info!(
+        "Loaded {} Yougile users for project {}",
+        users.len(),
+        query.project_id
+    );
+    Ok(Json(users))
 }

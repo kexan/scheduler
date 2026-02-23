@@ -1,10 +1,9 @@
-use log::debug;
 use serde::{Deserialize, Serialize};
 use std::path::Path;
-use tokio::fs::{create_dir_all, read_to_string, write};
+use tokio::fs::read_to_string;
+use tracing::debug;
 
 use crate::error::{AppError, Result};
-use crate::yougile::models::{ProjectInfo, UserInfo};
 
 const SETTINGS_PATH: &str = "data/yougile_config.json";
 
@@ -12,25 +11,11 @@ const SETTINGS_PATH: &str = "data/yougile_config.json";
 pub struct YougileConfig {
     pub enabled: bool,
     pub api_url: String,
-    #[serde(default)]
-    pub api_token: String,
-    pub project_id: String,
-    #[serde(default)]
-    pub project_title: String,
-    pub board_id: String,
-    #[serde(default)]
-    pub board_title: String,
-    pub column_id: String,
-    #[serde(default)]
-    pub column_title: String,
-    #[serde(default)]
-    pub projects_map: Vec<ProjectInfo>,
-    #[serde(default)]
-    pub users_map: Vec<UserInfo>,
-    #[serde(default)]
+    pub api_token: Option<String>,
+    pub project_id: Option<String>,
+    pub board_id: Option<String>,
+    pub column_id: Option<String>,
     pub assignee_id: Option<String>,
-    #[serde(default)]
-    pub assignee_name: Option<String>,
 }
 
 impl Default for YougileConfig {
@@ -38,17 +23,11 @@ impl Default for YougileConfig {
         Self {
             enabled: false,
             api_url: "https://yougile.com".to_string(),
-            api_token: String::new(),
-            project_id: String::new(),
-            project_title: String::new(),
-            board_id: String::new(),
-            board_title: String::new(),
-            column_id: String::new(),
-            column_title: String::new(),
-            projects_map: Vec::new(),
-            users_map: Vec::new(),
+            api_token: None,
+            project_id: None,
+            board_id: None,
+            column_id: None,
             assignee_id: None,
-            assignee_name: None,
         }
     }
 }
@@ -56,21 +35,7 @@ impl Default for YougileConfig {
 impl YougileConfig {
     pub async fn save(&self) -> Result<()> {
         let json = serde_json::to_vec_pretty(self).map_err(AppError::Json)?;
-
-        let path = Path::new(SETTINGS_PATH);
-        let tmp_path = path.with_extension("json.tmp");
-
-        if let Some(parent) = path.parent() {
-            create_dir_all(parent).await.map_err(AppError::Io)?;
-        }
-
-        write(&tmp_path, &json).await.map_err(AppError::Io)?;
-
-        tokio::fs::rename(&tmp_path, path)
-            .await
-            .map_err(AppError::Io)?;
-
-        Ok(())
+        crate::utils::atomic_write(Path::new(SETTINGS_PATH), &json).await
     }
 }
 

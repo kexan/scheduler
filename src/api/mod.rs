@@ -47,7 +47,6 @@ pub fn routes(scheduler: Arc<Scheduler>, yougile: Arc<YougileClient>) -> Router 
         .route("/api/slots", post(slots::create_slot_handler))
         .route("/api/slots/{id}", delete(slots::delete_slot_handler))
         .route("/api/slots/{id}", put(slots::update_slot_handler))
-        .route("/api/slots/{id}/full", put(slots::update_slot_full_handler))
         .route(
             "/api/yougile/settings",
             get(yougile::get_yougile_config_handler),
@@ -56,14 +55,10 @@ pub fn routes(scheduler: Arc<Scheduler>, yougile: Arc<YougileClient>) -> Router 
             "/api/yougile/settings",
             put(yougile::update_yougile_config_handler),
         )
-        .route(
-            "/api/yougile/test",
-            post(yougile::test_yougile_connection_handler),
-        )
-        .route(
-            "/api/yougile/users",
-            post(yougile::load_yougile_users_handler),
-        )
+        .route("/api/yougile/projects", get(yougile::get_projects_handler))
+        .route("/api/yougile/boards", get(yougile::get_boards_handler))
+        .route("/api/yougile/columns", get(yougile::get_columns_handler))
+        .route("/api/yougile/users", get(yougile::get_users_handler))
         .layer(from_fn_with_state(app_state.clone(), auth_middleware));
 
     public_routes
@@ -93,26 +88,17 @@ async fn static_handler(Path(path): Path<String>) -> Result<Response, (StatusCod
 
     match file {
         Some(file) => {
-            let actual_path = if path.is_empty() || STATIC_DIR.get_file(&path).is_none() {
-                "index.html"
-            } else {
-                &path
-            };
-
-            let content_type = if actual_path.ends_with(".html") {
-                "text/html"
-            } else {
-                match std::path::Path::new(actual_path)
-                    .extension()
-                    .and_then(|ext| ext.to_str())
-                {
-                    Some("css") => "text/css",
-                    Some("js") => "application/javascript",
-                    Some("ico") => "image/x-icon",
-                    Some("png") => "image/png",
-                    Some("svg") => "image/svg+xml",
-                    _ => "application/octet-stream",
-                }
+            let content_type = match std::path::Path::new(&path)
+                .extension()
+                .and_then(|ext| ext.to_str())
+            {
+                Some("html") => "text/html",
+                Some("css") => "text/css",
+                Some("js") => "application/javascript",
+                Some("ico") => "image/x-icon",
+                Some("png") => "image/png",
+                Some("svg") => "image/svg+xml",
+                _ => "application/octet-stream",
             };
 
             let headers = axum::http::HeaderMap::from_iter([(
