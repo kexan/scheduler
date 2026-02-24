@@ -1,4 +1,51 @@
-# Deployment Guide
+## Prerequisites
+
+You need Rust and Cargo installed.
+
+### Install Rust (recommended way)
+https://rust-lang.org/tools/install/
+
+Run this:
+
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+Restart your shell, then verify:
+
+```bash
+rustc --version
+cargo --version
+```
+
+### Update Rust
+
+```bash
+rustup update
+```
+
+### Install build dependencies (Linux)
+
+On Debian/Ubuntu:
+
+```bash
+sudo apt update
+sudo apt install build-essential pkg-config libssl-dev
+```
+
+On Arch:
+
+```bash
+sudo pacman -S base-devel pkg-config openssl
+```
+
+On Fedora:
+
+```bash
+sudo dnf install gcc pkg-config openssl-devel
+```
+
+---
 
 ## Quick Start
 
