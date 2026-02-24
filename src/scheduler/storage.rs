@@ -4,6 +4,7 @@ use tracing::{debug, error};
 
 use crate::error::{AppError, Result};
 use crate::scheduler::models::TimeSlot;
+use crate::utils::atomic_write;
 
 const SLOTS_PATH: &str = "data/slots.json";
 
@@ -33,23 +34,5 @@ pub async fn load_slots() -> Result<Vec<TimeSlot>> {
 
 pub async fn save_slots(slots: &[TimeSlot]) -> Result<()> {
     let json = serde_json::to_vec_pretty(slots).map_err(AppError::Json)?;
-
-    let path = Path::new(SLOTS_PATH);
-    let tmp_path = path.with_extension("json.tmp");
-
-    if let Some(parent) = path.parent() {
-        async_fs::create_dir_all(parent)
-            .await
-            .map_err(AppError::Io)?;
-    }
-
-    async_fs::write(&tmp_path, &json)
-        .await
-        .map_err(AppError::Io)?;
-
-    async_fs::rename(&tmp_path, path)
-        .await
-        .map_err(AppError::Io)?;
-
-    Ok(())
+    atomic_write(Path::new(SLOTS_PATH), &json).await
 }

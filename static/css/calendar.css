@@ -2,11 +2,10 @@
     display: grid;
     grid-template-columns: repeat(7, 1fr);
     grid-template-rows: 32px;
-    grid-auto-rows: minmax(120px, 1fr);
+    grid-auto-rows: minmax(140px, 1fr);
     gap: 0;
     border: 1px solid var(--calendar-border);
     border-radius: var(--calendar-radius);
-    overflow: hidden;
     width: 100%;
 }
 
@@ -21,6 +20,9 @@
     min-height: 32px;
     border-right: 1px solid var(--calendar-border);
     border-bottom: 1px solid var(--calendar-border);
+    position: sticky;
+    top: 0;
+    z-index: 1;
 }
 
 .calendar-header:nth-child(7n) {
@@ -31,10 +33,10 @@
     background-color: white;
     padding: 8px;
     position: relative;
-    min-height: 120px;
     border-right: 1px solid var(--calendar-border);
     border-bottom: 1px solid var(--calendar-border);
-    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
 .calendar-day:nth-child(7n) {
@@ -42,16 +44,12 @@
 }
 
 .calendar-day.other-month {
-    background-color: var(--light-color);
+    background-color: var(--other-month-bg);
     color: var(--secondary-color);
 }
 
 .calendar-day.today {
     background-color: #e3f2fd;
-}
-
-.calendar-day.past-day {
-    background-color: #f8f9fa;
 }
 
 .calendar-day-number.disabled-day {
@@ -62,10 +60,49 @@
 .calendar-day-number {
     font-weight: bold;
     margin-bottom: 5px;
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+}
+
+.admin-add-slot-btn {
+    margin-left: auto;
+    background: none;
+    border: none;
+    color: #28a745;
+    font-size: 1.1em;
+    font-weight: bold;
+    line-height: 1;
+    padding: 0 2px;
+    cursor: pointer;
+    opacity: 0.6;
+    transition: opacity 0.15s ease;
+    flex-shrink: 0;
+}
+
+.admin-add-slot-btn:hover {
+    opacity: 1;
+}
+
+.month-label {
+    font-size: 0.72em;
+    font-weight: normal;
+    opacity: 0.6;
 }
 
 .calendar-slots {
     font-size: 0.8em;
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.calendar-slots.no-scroll {
+    overflow-y: visible;
+}
+
+.calendar-slots.with-scroll {
+    max-height: 100px;
 }
 
 .calendar-slot {
@@ -85,7 +122,9 @@
 }
 
 .calendar-slot.available,
-.calendar-slot:not(.booked):not(.in-progress):not(.completed):not(.past-date-available) {
+.calendar-slot:not(.booked):not(.in-progress):not(.completed):not(
+        .past-date-available
+    ) {
     background-color: var(--slot-available-bg);
     color: var(--slot-available-color);
 }
@@ -106,30 +145,4 @@
 .calendar-slot.past-date-available {
     background-color: var(--slot-past-available-bg);
     color: var(--secondary-color);
-}
-
-.calendar-slot-more {
-    background-color: var(--slot-more-bg);
-    border-radius: 3px;
-    padding: 2px 4px;
-    cursor: pointer;
-    text-align: center;
-    font-weight: bold;
-    transition: background-color 0.2s ease;
-}
-
-.calendar-slot-more:hover {
-    background-color: var(--slot-more-hover);
-}
-
-.calendar-slot.admin-add-slot {
-    background-color: #a8e6cf !important;
-    color: #155724 !important;
-    font-weight: bold;
-    text-align: center;
-    font-size: 1.2em;
-}
-
-.calendar-slot.admin-add-slot:hover {
-    background-color: #8cdbb8 !important;
 }

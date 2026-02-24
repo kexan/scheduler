@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Планировщик миграций компаний</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="stylesheet" href="css/base.css">
     <link rel="stylesheet" href="css/layout.css">
@@ -18,12 +18,17 @@
         <div class="container">
             <div class="d-flex justify-content-between align-items-center">
                 <h1>📅 Планировщик миграций компаний</h1>
-                <div class="d-flex gap-2">
+                <div class="d-flex gap-3 align-items-center">
+                    <small class="text-white">
+                        <i class="bi bi-clock"></i>
+                        Время указано в часовом поясе МСК: <span id="currentTimeMSK"></span>
+                    </small>
                     <button id="reglamentBtn" class="btn btn-outline-info btn-sm">📋 Регламент миграции</button>
                     <button id="adminToggle" class="btn btn-outline-secondary btn-sm">🗝️</button>
                 </div>
             </div>
         </div>
+
     </header>
 
 
@@ -48,27 +53,19 @@
     </div>
 
 
-    <div class="alert alert-info alert-dismissible fade show timezone-alert" role="alert">
-        <div class="container">
-            <i class="bi bi-info-circle-fill me-2"></i>
-            <strong>Внимание!</strong> Все время указано в часовом поясе МСК (UTC+3). 
-            <small class="text-muted">Текущее время МСК: <span id="currentTimeMSK"></span></small>
-        </div>
-    </div>
-
-    <div class="container">
+    <div class="container" id="calendarPage">
 
         <div class="row">
             <div class="col-12">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h3>📅 Календарь слотов</h3>
+                    <h5>📅 Календарь слотов</h5>
                     <div class="d-flex gap-2 align-items-center">
-                        <button id="prevMonth" class="btn btn-outline-primary">◀</button>
+                        <button id="prevMonth" class="btn btn-outline-primary btn-sm">◀</button>
                         <span id="currentMonth" class="fw-bold align-self-center"></span>
-                        <button id="nextMonth" class="btn btn-outline-primary">▶</button>
+                        <button id="nextMonth" class="btn btn-outline-primary btn-sm">▶</button>
                     </div>
                 </div>
-                
+
 
                 <div class="d-flex gap-2 mb-3" id="adminControls" style="display: none;">
                     <button id="toggleCopyPanel" class="btn btn-outline-info btn-sm">
@@ -78,7 +75,7 @@
                         🔧 Настройки Yougile
                     </button>
                 </div>
-                
+
                 <div id="adminCopyPanel" class="admin-copy-panel mb-3" style="display: none;">
                     <div class="card">
                         <div class="card-body">
@@ -261,7 +258,7 @@
                     <div class="alert alert-warning">
                         <strong>Важно:</strong> Нельзя запланировать миграцию день в день. Планируйте заранее!
                     </div>
-                    
+
                     <h6>Чтобы запланировать миграцию, необходимо выбрать слот из доступных и ввести:</h6>
                     <ul>
                         <li>Название компании</li>
@@ -302,10 +299,10 @@
                         <strong>Источник:</strong> <span id="copySourceDate"></span><br>
                         <strong>Слоты для копирования:</strong> <span id="copySourceSlots"></span>
                     </div>
-                    
+
                     <h6>Дни назначения:</h6>
                     <div id="copyTargetDates"></div>
-                    
+
                     <div class="alert alert-warning mt-3">
                         <i class="bi bi-exclamation-triangle-fill me-2"></i>
                         <strong>Внимание!</strong> Существующие слоты в целевых датах будут заменены.
@@ -336,52 +333,52 @@
                                 </label>
                             </div>
                         </div>
-                        
+
                         <div class="mb-3">
                             <label for="yougileApiUrl" class="form-label">API URL</label>
                             <input type="url" class="form-control" id="yougileApiUrl" value="https://api.yougile.com">
                         </div>
-                        
+
                         <div class="mb-3">
                             <label for="yougileApiToken" class="form-label">API Token</label>
                             <input type="password" class="form-control" id="yougileApiToken" placeholder="Введите токен Yougile">
                         </div>
-                        
+
                         <div class="mb-3">
                             <label for="yougileProjectId" class="form-label">Проект</label>
                             <select class="form-select" id="yougileProjectId" disabled>
                                 <option value="">Сначала проверьте подключение</option>
                             </select>
                         </div>
-                        
+
                         <div class="mb-3">
                             <label for="yougileBoardId" class="form-label">Доска</label>
                             <select class="form-select" id="yougileBoardId" disabled>
                                 <option value="">Сначала выберите проект</option>
                             </select>
                         </div>
-                        
+
                         <div class="mb-3">
                             <label for="yougileColumnId" class="form-label">Колонка</label>
                             <select class="form-select" id="yougileColumnId" disabled>
                                 <option value="">Сначала выберите доску</option>
                             </select>
                         </div>
-                        
+
                         <div class="mb-3" id="loadUsersSection" style="display: none;">
                             <button type="button" class="btn btn-outline-secondary" id="loadYougileUsers">
                                 👥 Загрузить пользователей
                             </button>
                             <div id="usersLoadResult" class="mt-2"></div>
                         </div>
-                        
+
                         <div class="mb-3" id="assigneeSection" style="display: none;">
                             <label for="yougileAssigneeId" class="form-label">Исполнитель</label>
                             <select class="form-select" id="yougileAssigneeId">
                                 <option value="">Выберите исполнителя</option>
                             </select>
                         </div>
-                        
+
                         <div class="mb-3">
                             <button type="button" class="btn btn-outline-primary" id="testYougileConnection">
                                 🧪 Проверить подключение
@@ -398,8 +395,8 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-    
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.bundle.min.js"></script>
+
     <script src="js/utils.js"></script>
     <script src="js/api.js"></script>
     <script src="js/calendar.js"></script>

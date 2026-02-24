@@ -1,6 +1,7 @@
 pub mod models;
 pub mod storage;
 
+use chrono::NaiveDate;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::Mutex;
@@ -31,7 +32,7 @@ impl Scheduler {
     }
 
     async fn do_save(&self) -> Result<()> {
-        let slots = self.get_slots().await;
+        let slots = self.get_all_slots().await;
 
         save_slots(&slots)
             .await
@@ -107,10 +108,34 @@ impl Scheduler {
         Ok(slot)
     }
 
-    pub async fn get_slots(&self) -> Vec<TimeSlot> {
+    pub async fn get_all_slots(&self) -> Vec<TimeSlot> {
+        self.get_slots_in_range(None, None).await
+    }
+
+    pub async fn get_slots_in_range(
+        &self,
+        from: Option<NaiveDate>,
+        to: Option<NaiveDate>,
+    ) -> Vec<TimeSlot> {
         let mut slots: Vec<TimeSlot> = {
             let inner = self.inner.lock().await;
-            inner.values().cloned().collect()
+            inner
+                .values()
+                .filter(|slot| {
+                    if let Some(from) = from
+                        && slot.date < from
+                    {
+                        return false;
+                    }
+                    if let Some(to) = to
+                        && slot.date > to
+                    {
+                        return false;
+                    }
+                    true
+                })
+                .cloned()
+                .collect()
         };
 
         slots.sort_by(|a, b| a.date.cmp(&b.date).then(a.start_time.cmp(&b.start_time)));
@@ -147,29 +172,6 @@ impl Scheduler {
     }
 
     pub async fn update_slot(
-        &self,
-        id: Uuid,
-        create_time_slot: CreateTimeSlot,
-    ) -> Result<TimeSlot> {
-        let slot = {
-            let mut inner = self.inner.lock().await;
-            let slot = inner.get_mut(&id).ok_or(AppError::SlotNotFound)?;
-
-            slot.date = create_time_slot.date;
-            slot.start_time = create_time_slot.start_time;
-            slot.end_time = create_time_slot.end_time;
-            slot.clone()
-        };
-        self.do_save().await?;
-
-        info!(
-            "Slot {} updated to date: {}, time: {}-{}",
-            slot.id, slot.date, slot.start_time, slot.end_time
-        );
-        Ok(slot)
-    }
-
-    pub async fn update_slot_full(
         &self,
         id: Uuid,
         update_time_slot: UpdateTimeSlot,
@@ -215,7 +217,7 @@ impl Scheduler {
         self.do_save().await?;
 
         info!(
-            "Slot {} fully updated - date: {}, available: {}, has_booking: {}",
+            "Slot {} updated - date: {}, available: {}, has_booking: {}",
             slot.id,
             slot.date,
             slot.is_available,

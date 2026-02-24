@@ -1,8 +1,8 @@
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use migration_scheduler::cli;
 use migration_scheduler::error::AppError;
+use migration_scheduler::web;
 
 #[tokio::main]
 async fn main() -> Result<(), AppError> {
@@ -14,8 +14,12 @@ async fn main() -> Result<(), AppError> {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
-    info!("Logging initialized");
     info!("Migration Scheduler starting...");
 
-    cli::run_cli().await
+    let port: u16 = std::env::var("PORT")
+        .ok()
+        .and_then(|p| p.parse().ok())
+        .unwrap_or(3030);
+
+    web::start_server(port).await
 }

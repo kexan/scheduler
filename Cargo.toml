@@ -1,6 +1,6 @@
 [package]
 name = "migration-scheduler"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2024"
 
 [lib]
@@ -22,12 +22,7 @@ tower-http = { version = "0.6", features = ["cors", "fs", "trace"] }
 uuid = { version = "1.21.0", features = ["v4", "serde"] }
 sha2 = "0.11.0-rc.5"
 chrono = { version = "0.4", features = ["serde"] }
-async-trait = "0.1"
-clap = { version = "4.5.60", features = ["derive"] }
-tabled = "0.20"
 include_dir = { version = "0.7", features = ["glob"] }
-log = "0.4"
-env_logger = "0.11"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 yougile-api-client = { git = "https://github.com/kexan/yougile-rs.git", branch = "main" }

@@ -1,16 +1,71 @@
-/* Стили для хедера и общей компоновки */
+/* Базовая раскладка страницы */
+
+html,
+body {
+    height: 100%;
+    overflow: hidden;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
 header {
     background-color: var(--primary-color);
     color: white;
-    padding: 1rem 0;
-    margin-bottom: 2rem;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    padding: 0.5rem 0;
+    margin-bottom: 0;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    flex-shrink: 0;
 }
 
 header h1 {
     margin: 0;
-    font-size: 1.8rem;
+    font-size: 1.5rem;
     font-weight: 300;
+}
+
+.timezone-alert {
+    flex-shrink: 0;
+}
+
+#calendarPage {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+}
+
+#calendarPage > .row {
+    flex: 1;
+    min-height: 0;
+    margin: 0;
+    flex-wrap: nowrap;
+}
+
+#calendarPage > .row > .col-12 {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    max-width: 100%;
+    min-height: 0;
+    padding: 0;
+}
+
+#calendarPage > .row > .col-12 > .d-flex,
+#calendarPage > .row > .col-12 > #adminControls,
+#calendarPage > .row > .col-12 > #adminCopyPanel {
+    flex-shrink: 0;
+}
+
+#calendarContainer {
+    flex: 1;
+    min-height: 0;
+    overflow: auto;
+    margin-bottom: 0 !important;
 }
 
 .container {
