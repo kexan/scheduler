@@ -6,7 +6,7 @@
 ```bash
 git clone https://github.com/kexan/scheduler
 cd scheduler
-cargo run --release
+cargo run
 ```
 Open http://localhost:3030
 
