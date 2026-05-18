@@ -1,6 +1,6 @@
 [package]
 name = "migration-scheduler"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2024"
 
 [lib]
@@ -12,27 +12,27 @@ name = "migration-scheduler"
 path = "src/main.rs"
 
 [dependencies]
-tokio = { version = "1.49.0", features = ["full"] }
+tokio = { version = "1.52.3", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "2.0"
 axum = { version = "0.8", features = ["macros"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "fs", "trace"] }
-uuid = { version = "1.21.0", features = ["v4", "serde"] }
+uuid = { version = "1.23.1", features = ["v4", "serde"] }
 sha2 = "0.11.0-rc.5"
 chrono = { version = "0.4", features = ["serde"] }
 include_dir = { version = "0.7", features = ["glob"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 yougile-api-client = { git = "https://github.com/kexan/yougile-rs.git", branch = "main" }
-fastrand = "2.3.0"
+fastrand = "2.4.1"
+chrono-tz = "0.10.4"
+arc-swap = "1.9.1"
+parking_lot = "0.12.5"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
 tower-http = { version = "0.6", features = ["cors"] }
 axum = "0.8"
-
-[[test]]
-name = "api_test"
-path = "tests/api_test.rs"
+serial_test = "3.0"

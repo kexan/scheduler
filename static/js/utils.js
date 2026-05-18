@@ -70,6 +70,57 @@ class Utils {
       }
     }, 5000);
   }
+
+  static validateField(id, validationFn, errorMsg) {
+    const element = DOMHelper.get(id);
+    if (!element) return true;
+    const val = element.value.trim();
+    const isValid = validationFn(val);
+
+    element.classList.remove("is-valid", "is-invalid");
+    const parent = element.parentElement;
+    const existingFeedback = parent.querySelector(".invalid-feedback");
+    if (existingFeedback) {
+      existingFeedback.remove();
+    }
+
+    if (!isValid) {
+      element.classList.add("is-invalid");
+      const feedback = document.createElement("div");
+      feedback.className = "invalid-feedback";
+      feedback.textContent = errorMsg;
+      parent.appendChild(feedback);
+      return false;
+    } else {
+      element.classList.add("is-valid");
+      return true;
+    }
+  }
+
+  static clearValidation(formId) {
+    const form = DOMHelper.get(formId);
+    if (!form) return;
+    form.querySelectorAll(".is-valid, .is-invalid").forEach((el) => {
+      el.classList.remove("is-valid", "is-invalid");
+    });
+    form.querySelectorAll(".invalid-feedback").forEach((el) => {
+      el.remove();
+    });
+  }
+
+  static checkTimezoneDifference() {
+    const userOffset = new Date().getTimezoneOffset();
+    const mskOffset = -180;
+    if (userOffset !== mskOffset) {
+      const diffMinutes = mskOffset - userOffset;
+      const diffHours = diffMinutes / 60;
+      const sign = diffHours > 0 ? "+" : "";
+      const text = `${sign}${diffHours} ч`;
+      const diffSpan = DOMHelper.get("timezoneDiff");
+      if (diffSpan) diffSpan.textContent = text;
+      DOMHelper.show("timezoneAlert");
+    }
+  }
 }
 
 
@@ -164,6 +215,11 @@ class EventManager {
     const element = DOMHelper.get(id);
     if (element) element.addEventListener('change', handler);
   }
+
+  static onInput(id, handler) {
+    const element = DOMHelper.get(id);
+    if (element) element.addEventListener('input', handler);
+  }
 }
 
 
@@ -185,3 +241,6 @@ class ButtonHelper {
     }
   }
 }
+
+export { Utils, DOMHelper, FormHelper, EventManager, ButtonHelper };
+

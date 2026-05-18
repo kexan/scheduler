@@ -1,33 +1,49 @@
 use crate::error::AppError;
+use chrono::{DateTime, Utc};
+use parking_lot::RwLock;
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
-use tokio::sync::Mutex;
+use std::time::Duration;
 use tokio::time;
 use tracing::{debug, info};
 use uuid::Uuid;
 
-#[derive(Clone, Default)]
+const SESSION_DURATION: Duration = Duration::from_secs(3600);
+
+#[derive(Clone)]
 pub struct AdminToken {
-    tokens: Arc<Mutex<HashMap<Vec<u8>, Instant>>>,
+    tokens: Arc<RwLock<HashMap<Vec<u8>, DateTime<Utc>>>>,
 }
 
-const SESSION_DURATION: Duration = Duration::from_secs(3600);
+impl Default for AdminToken {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 impl AdminToken {
     pub fn new() -> Self {
-        let tokens = Arc::new(Mutex::new(HashMap::new()));
+        let tokens = Arc::new(RwLock::new(HashMap::new()));
+        let tokens_weak = Arc::downgrade(&tokens);
 
-        let tokens_clone = tokens.clone();
         tokio::spawn(async move {
             loop {
                 time::sleep(SESSION_DURATION).await;
-                let now = Instant::now();
-                let mut tokens_guard = tokens_clone.lock().await;
-                let before = tokens_guard.len();
-                tokens_guard.retain(|_, expires| *expires > now);
-                let removed = before - tokens_guard.len();
+
+                let Some(tokens_clone) = tokens_weak.upgrade() else {
+                    debug!("AdminToken dropped, stopping session cleanup task");
+                    break;
+                };
+
+                let now = Utc::now();
+                let removed = {
+                    let mut guard = tokens_clone.write();
+                    let before = guard.len();
+                    guard.retain(|_, expires| *expires > now);
+                    before - guard.len()
+                };
+
                 if removed > 0 {
                     info!("Cleaned up {} expired sessions", removed);
                 } else {
@@ -45,39 +61,37 @@ impl AdminToken {
         hasher.finalize().to_vec()
     }
 
-    pub async fn create_session(&self) -> String {
+    pub fn create_session(&self) -> String {
         let token = Uuid::new_v4().to_string();
         let hash = Self::hash_token(&token);
-        let expires = Instant::now() + SESSION_DURATION;
+        let expires = Utc::now() + chrono::Duration::seconds(SESSION_DURATION.as_secs() as i64);
 
-        self.tokens.lock().await.insert(hash, expires);
-
-        let max_age = SESSION_DURATION.as_secs();
+        self.tokens.write().insert(hash, expires);
 
         format!(
             "admin_token={}; HttpOnly; Secure; SameSite=Strict; Max-Age={}; Path=/",
-            token, max_age
+            token,
+            SESSION_DURATION.as_secs()
         )
     }
 
-    pub async fn verify(&self, token: &str) -> bool {
+    pub fn verify(&self, token: &str) -> bool {
         let hash = Self::hash_token(token);
-        let mut tokens = self.tokens.lock().await;
+        let now = Utc::now();
 
-        match tokens.get(&hash) {
-            Some(expiration) => {
-                if Instant::now() > *expiration {
-                    tokens.remove(&hash);
-                    false
-                } else {
-                    true
-                }
+        if let Some(expiration) = self.tokens.read().get(&hash) {
+            if &now <= expiration {
+                return true;
             }
-            None => false,
+        } else {
+            return false;
         }
+
+        self.tokens.write().remove(&hash);
+        false
     }
 
-    pub async fn check_auth(&self, cookie_header: Option<String>) -> Result<(), AppError> {
+    pub fn check_auth(&self, cookie_header: Option<&str>) -> Result<(), AppError> {
         let cookie_header = cookie_header.unwrap_or_default();
 
         let token = cookie_header.split(';').find_map(|cookie| {
@@ -90,8 +104,15 @@ impl AdminToken {
         });
 
         match token {
-            Some(token) if self.verify(token).await => Ok(()),
+            Some(token) if self.verify(token) => Ok(()),
             _ => Err(AppError::Unauthorized),
+        }
+    }
+
+    pub fn logout(&self, token: &str) {
+        let hash = Self::hash_token(token);
+        if self.tokens.write().remove(&hash).is_some() {
+            info!("Session logged out");
         }
     }
 }

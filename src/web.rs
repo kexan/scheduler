@@ -10,7 +10,7 @@ pub async fn start_server(port: u16) -> Result<()> {
     info!("Starting web server on port {}", port);
 
     let scheduler = Arc::new(Scheduler::new().await?);
-    let slot_count = scheduler.get_all_slots().await.len();
+    let slot_count = scheduler.slot_count();
     if slot_count > 0 {
         info!("Loaded {} slots from storage", slot_count);
     } else {
