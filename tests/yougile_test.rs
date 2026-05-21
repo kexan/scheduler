@@ -18,11 +18,15 @@ fn clean_test_file() {
 }
 
 fn get_test_url() -> String {
-    std::env::var("YOUGILE_TEST_API_URL").unwrap()
+    std::env::var("YOUGILE_TEST_API_URL").unwrap_or_default()
 }
 
 fn get_test_token() -> String {
-    std::env::var("YOUGILE_TEST_API_TOKEN").unwrap()
+    std::env::var("YOUGILE_TEST_API_TOKEN").unwrap_or_default()
+}
+
+fn should_skip_test() -> bool {
+    get_test_url().is_empty() || get_test_token().is_empty()
 }
 
 fn test_config() -> YougileConfig {
@@ -70,6 +74,7 @@ fn make_test_slot() -> TimeSlot {
 #[tokio::test]
 #[serial]
 async fn yougile_load_projects() {
+    if should_skip_test() { return; }
     let client = create_yougile_client().await;
 
     let projects = client.load_projects().await.unwrap();
@@ -90,6 +95,7 @@ async fn yougile_load_projects() {
 #[tokio::test]
 #[serial]
 async fn yougile_load_boards() {
+    if should_skip_test() { return; }
     let client = create_yougile_client().await;
 
     let projects = client.load_projects().await.unwrap();
@@ -109,6 +115,7 @@ async fn yougile_load_boards() {
 #[tokio::test]
 #[serial]
 async fn yougile_load_columns() {
+    if should_skip_test() { return; }
     let client = create_yougile_client().await;
 
     let projects = client.load_projects().await.unwrap();
@@ -134,6 +141,7 @@ async fn yougile_load_columns() {
 #[tokio::test]
 #[serial]
 async fn yougile_load_users() {
+    if should_skip_test() { return; }
     let client = create_yougile_client().await;
 
     let projects = client.load_projects().await.unwrap();
@@ -154,6 +162,7 @@ async fn yougile_load_users() {
 #[tokio::test]
 #[serial]
 async fn yougile_create_task() {
+    if should_skip_test() { return; }
     let client = create_yougile_client().await;
 
     let slot = make_test_slot();
@@ -171,6 +180,7 @@ async fn yougile_create_task() {
 #[tokio::test]
 #[serial]
 async fn yougile_create_and_update_task() {
+    if should_skip_test() { return; }
     let client = create_yougile_client().await;
 
     let mut slot = make_test_slot();
@@ -192,6 +202,7 @@ async fn yougile_create_and_update_task() {
 #[tokio::test]
 #[serial]
 async fn yougile_delete_task() {
+    if should_skip_test() { return; }
     let client = create_yougile_client().await;
 
     let slot = make_test_slot();
@@ -207,6 +218,7 @@ async fn yougile_delete_task() {
 #[tokio::test]
 #[serial]
 async fn yougile_disabled_returns_empty() {
+    if should_skip_test() { return; }
     clean_test_file();
 
     let disabled_config = YougileConfig {
@@ -236,6 +248,7 @@ async fn yougile_disabled_returns_empty() {
 #[tokio::test]
 #[serial]
 async fn yougile_config_update_persists() {
+    if should_skip_test() { return; }
     clean_test_file();
 
     let client = create_yougile_client().await;
@@ -257,6 +270,7 @@ async fn yougile_config_update_persists() {
 #[tokio::test]
 #[serial]
 async fn yougile_full_task_lifecycle() {
+    if should_skip_test() { return; }
     let client = create_yougile_client().await;
 
     let projects = client.load_projects().await.unwrap();
