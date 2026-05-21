@@ -33,7 +33,7 @@ pub async fn admin_auth_handler(
         return Err(AppError::Unauthorized);
     }
 
-    let cookie = state.admin_token.create_session().await;
+    let cookie = state.admin_token.create_session();
 
     let mut response = Json(AdminAuthResponse {
         message: "Авторизация успешна".to_string(),
@@ -54,11 +54,41 @@ pub async fn check_auth_handler(
     State(state): State<AppState>,
     headers: HeaderMap,
 ) -> Json<CheckAuthResponse> {
-    let cookie = headers
-        .get("cookie")
-        .and_then(|v| v.to_str().ok())
-        .map(String::from);
-
-    let authenticated = state.admin_token.check_auth(cookie).await.is_ok();
+    let cookie = headers.get("cookie").and_then(|v| v.to_str().ok());
+    let authenticated = state.admin_token.check_auth(cookie).is_ok();
     Json(CheckAuthResponse { authenticated })
+}
+
+pub async fn logout_handler(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+) -> Result<Response, AppError> {
+    let cookie = headers.get("cookie").and_then(|v| v.to_str().ok());
+
+    let token = cookie.and_then(|c| c.split(';').find_map(|cookie| {
+        let (key, value) = cookie.trim().split_once('=')?;
+        if key == "admin_token" {
+            Some(value)
+        } else {
+            None
+        }
+    }));
+
+    if let Some(token) = token {
+        state.admin_token.logout(token);
+    }
+
+    let mut response = Json(serde_json::json!({
+        "message": "Выход выполнен"
+    }))
+    .into_response();
+
+    response.headers_mut().insert(
+        axum::http::HeaderName::from_static("set-cookie"),
+        "admin_token=; HttpOnly; Secure; SameSite=Strict; Max-Age=0; Path=/"
+            .parse()
+            .expect("clear cookie is always a valid header value"),
+    );
+
+    Ok(response)
 }

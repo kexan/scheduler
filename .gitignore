@@ -15,4 +15,4 @@ devenv.local.yaml
 /target
 data
 yougile_settings.json
-yougile_settings.json
+/node_modules

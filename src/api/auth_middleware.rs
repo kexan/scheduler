@@ -15,10 +15,9 @@ pub async fn auth_middleware(
     let cookie = request
         .headers()
         .get("cookie")
-        .and_then(|v| v.to_str().ok())
-        .map(|s| s.to_string());
+        .and_then(|v| v.to_str().ok());
 
-    match state.admin_token.check_auth(cookie).await {
+    match state.admin_token.check_auth(cookie) {
         Ok(()) => next.run(request).await,
         Err(_) => (StatusCode::UNAUTHORIZED, "Unauthorized").into_response(),
     }

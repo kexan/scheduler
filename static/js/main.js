@@ -1,3 +1,8 @@
+import { Utils, DOMHelper, ButtonHelper, EventManager } from './utils.js';
+import { Api } from './api.js';
+import { Calendar } from './calendar.js';
+import { Modals } from './modals.js';
+
 class Scheduler {
   constructor() {
     this.slots = [];
@@ -15,14 +20,11 @@ class Scheduler {
       if (this.isAuthenticated) {
         this.toggleAdminMode();
       } else {
-        this.showAdminAuthModal();
+        this.modals.openAdminAuthModal();
       }
     });
-    EventManager.onClick("reglamentBtn", () => this.openReglamentModal());
+    EventManager.onClick("reglamentBtn", () => this.modals.openReglamentModal());
 
-    EventManager.onSubmit("adminAuthForm", async () => {
-      await this.handleAdminAuth();
-    });
 
     const toggleBtn = DOMHelper.get("toggleCopyPanel");
     if (toggleBtn) {
@@ -70,10 +72,26 @@ class Scheduler {
     document.getElementById("clearSelection").addEventListener("click", () => {
       this.calendar.clearSelection();
     });
+
+    document.addEventListener("keydown", (e) => {
+      if (document.querySelector(".modal.show")) return;
+      if (
+        document.activeElement.tagName === "INPUT" ||
+        document.activeElement.tagName === "TEXTAREA"
+      )
+        return;
+
+      if (e.key === "ArrowLeft") {
+        this.calendar.prevMonth();
+      } else if (e.key === "ArrowRight") {
+        this.calendar.nextMonth();
+      }
+    });
   }
 
   async init() {
     this.setupEventListeners();
+    Utils.checkTimezoneDifference();
 
     await this.checkAuthStatus();
 
@@ -81,85 +99,28 @@ class Scheduler {
     this.startMSKClock();
   }
 
-  showAdminAuthModal() {
-    const modalElement = DOMHelper.get("adminAuthModal");
-    const modal = new bootstrap.Modal(modalElement);
-    modal.show();
-  }
+  onAuthSuccess(data) {
+    this.isAuthenticated = true;
+    this.isAdminMode = true;
 
-  openReglamentModal() {
-    const modalElement = DOMHelper.get("reglamentModal");
-    const modal = new bootstrap.Modal(modalElement);
-    modal.show();
-  }
+    ButtonHelper.setIcon("adminToggle", "👤", "Обычный режим");
+    DOMHelper.addClass("adminControls", "show");
 
-  async handleAdminAuth() {
-    const password = document.getElementById("password").value;
-
-    try {
-      const response = await fetch("/api/auth/admin", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ password }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-
-        this.isAuthenticated = true;
-        this.isAdminMode = true;
-
-        const authModal = bootstrap.Modal.getInstance(
-          document.getElementById("adminAuthModal"),
-        );
-        authModal.hide();
-
-        ButtonHelper.setIcon("adminToggle", "👤", "Обычный режим");
-        DOMHelper.addClass("adminControls", "show");
-
-        this.calendar.setAdminMode(true);
-        Utils.showSuccess(data.message || "Авторизация прошла успешно");
-      } else {
-        const error = await response.json();
-        Utils.showError(error.error || "Ошибка авторизации");
-        this.shakePasswordField();
-      }
-    } catch (error) {
-      console.error("Auth error:", error);
-      Utils.showError("Ошибка сети при авторизации");
-      this.shakePasswordField();
-    }
-  }
-
-  shakePasswordField() {
-    document.getElementById("password").value = "";
-    document.getElementById("password").focus();
-
-    const passwordField = document.getElementById("password");
-    passwordField.classList.add("shake");
-    setTimeout(() => {
-      passwordField.classList.remove("shake");
-    }, 500);
+    this.calendar.setAdminMode(true);
+    Utils.showSuccess(data.message || "Авторизация прошла успешно");
   }
 
   async checkAuthStatus() {
     try {
-      const response = await fetch("/api/auth/check", {
-        credentials: "include",
-      });
+      const data = await this.api.checkAuth();
+      if (data.authenticated) {
+        this.isAuthenticated = true;
+        this.isAdminMode = true;
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data.authenticated) {
-          this.isAuthenticated = true;
-          this.isAdminMode = true;
-
-          ButtonHelper.setIcon("adminToggle", "👤", "Обычный режим");
-          DOMHelper.addClass("adminControls", "show");
-          this.calendar.setAdminMode(true);
-          return;
-        }
+        ButtonHelper.setIcon("adminToggle", "👤", "Обычный режим");
+        DOMHelper.addClass("adminControls", "show");
+        this.calendar.setAdminMode(true);
+        return;
       }
 
       this.logout();
@@ -182,9 +143,6 @@ class Scheduler {
       "btn-outline-danger",
       "btn-outline-info",
     );
-    if (adminControls) {
-      adminControls.classList.remove("show");
-    }
 
     const adminPanel = document.getElementById("adminCopyPanel");
     if (adminPanel) {
@@ -247,3 +205,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   scheduler = new Scheduler();
   await scheduler.init();
 });
+
+export { Scheduler, scheduler };
+

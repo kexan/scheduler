@@ -1,3 +1,6 @@
+import { Utils, DOMHelper, FormHelper, EventManager } from './utils.js';
+import { Templates } from './templates.js';
+
 class Modals {
   constructor(scheduler) {
     this.scheduler = scheduler;
@@ -6,31 +9,8 @@ class Modals {
 
   hideModal(modalId) {
     const modalElement = DOMHelper.get(modalId);
-    const modal = bootstrap.Modal.getInstance(modalElement);
-    if (!modal) {
-      document.querySelectorAll(".modal-backdrop").forEach((el) => el.remove());
-      document.body.classList.remove("modal-open");
-      document.body.style.removeProperty("overflow");
-      return;
-    }
-
-    document.querySelectorAll(".modal-backdrop").forEach((el) => el.remove());
-
-    const handleHidden = () => {
-      setTimeout(() => {
-        document
-          .querySelectorAll(".modal-backdrop")
-          .forEach((el) => el.remove());
-        document.body.classList.remove("modal-open");
-        document.body.style.removeProperty("overflow");
-
-        if (modalId === "editSlotModal") {
-          bootstrap.Modal.getInstance(modalElement)?.dispose();
-        }
-      }, 50);
-    };
-
-    modalElement.addEventListener("hidden.bs.modal", handleHidden);
+    if (!modalElement) return;
+    const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
     modal.hide();
   }
 
@@ -38,6 +18,8 @@ class Modals {
     EventManager.onSubmit("quickSlotForm", () => this.createQuickSlot());
     EventManager.onSubmit("bookingForm", () => this.bookSlot());
     EventManager.onSubmit("editSlotForm", () => this.updateSlot());
+    EventManager.onClick("deleteSlotBtn", () => this.deleteSlot());
+    EventManager.onSubmit("adminAuthForm", () => this.handleAdminAuth());
 
     EventManager.onClick("yougileSettingsBtn", () =>
       this.openYougileSettingsModal(),
@@ -71,6 +53,7 @@ class Modals {
     DOMHelper.set("adminEmail", "");
     DOMHelper.set("companyId", "");
     DOMHelper.set("downloadEmail", "");
+    Utils.clearValidation("bookingForm");
 
     const form = DOMHelper.get("bookingForm");
     if (form) {
@@ -85,7 +68,7 @@ class Modals {
     }
 
     try {
-      const modal = new bootstrap.Modal(modalElement);
+      const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
       modal.show();
     } catch (error) {
       console.error("Error creating booking modal:", error);
@@ -106,37 +89,7 @@ class Modals {
       statusText = "Забронирован";
     }
 
-    let html = `
-            <div class="mb-3">
-                <strong>Дата и время:</strong> ${Utils.formatDateTimeMSK(slot.date, slot.start_time)} - ${Utils.formatTime(slot.end_time)}
-            </div>
-            <div class="mb-3">
-                <strong>Статус:</strong> ${statusText}
-            </div>
-        `;
-
-    if (slot.booking) {
-      html += `
-                <div class="card">
-                    <div class="card-body">
-                        <h6 class="card-title">Информация о бронировании</h6>
-                        <div class="row">
-                            <div class="col-md-6">
-                                <strong>Компания:</strong> ${slot.booking.company_name}<br>
-                                <strong>Email администратора:</strong> ${slot.booking.admin_email}<br>
-                                <strong>ID компании:</strong> ${slot.booking.company_id}
-                            </div>
-                            <div class="col-md-6">
-                                <strong>Email получателя архива:</strong> ${slot.booking.download_email}<br>
-                                <strong>Дата создания:</strong> ${new Date(slot.booking.created_at).toLocaleString()}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-    }
-
-    DOMHelper.html("slotDetails", html);
+    DOMHelper.html("slotDetails", Templates.viewSlotModalContent(slot, statusText));
 
     const modalElement = DOMHelper.get("viewSlotModal");
     if (!modalElement) {
@@ -146,11 +99,7 @@ class Modals {
     }
 
     try {
-      const existingModal = bootstrap.Modal.getInstance(modalElement);
-      if (existingModal) {
-        existingModal.dispose();
-      }
-      const modal = new bootstrap.Modal(modalElement);
+      const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
       modal.show();
     } catch (error) {
       console.error("Error creating view modal:", error);
@@ -169,16 +118,14 @@ class Modals {
       return;
     }
 
-    const existingModal = bootstrap.Modal.getInstance(modalElement);
-    if (existingModal) {
-      existingModal.dispose();
-    }
+    // No need to dispose here, getOrCreateInstance handles it safely.
 
     DOMHelper.text("editSlotIdDisplay", slot.id);
     DOMHelper.set("editSlotId", slot.id);
     DOMHelper.set("editSlotDate", slot.date);
     DOMHelper.set("editSlotStartTime", slot.start_time);
     DOMHelper.set("editSlotEndTime", slot.end_time);
+    Utils.clearValidation("editSlotForm");
 
     if (slot.yougile_task_id) {
       DOMHelper.text("editYougileTaskIdDisplay", slot.yougile_task_id);
@@ -203,7 +150,7 @@ class Modals {
     }
 
     try {
-      const modal = new bootstrap.Modal(modalElement);
+      const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
       modal.show();
     } catch (error) {
       console.error("Error creating modal:", error);
@@ -216,6 +163,7 @@ class Modals {
     DOMHelper.set("quickSlotDateDisplay", Utils.formatDate(date));
     DOMHelper.set("quickSlotStartTime", "");
     DOMHelper.set("quickSlotEndTime", "");
+    Utils.clearValidation("quickSlotForm");
 
     const modalElement = DOMHelper.get("quickSlotModal");
     if (!modalElement) {
@@ -225,11 +173,7 @@ class Modals {
     }
 
     try {
-      const existingModal = bootstrap.Modal.getInstance(modalElement);
-      if (existingModal) {
-        existingModal.dispose();
-      }
-      const modal = new bootstrap.Modal(modalElement);
+      const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
       modal.show();
     } catch (error) {
       console.error("Error creating quick slot modal:", error);
@@ -238,85 +182,193 @@ class Modals {
   }
 
   async createQuickSlot() {
-    const slotData = {
-      date: DOMHelper.get("quickSlotDate").value,
-      start_time: DOMHelper.get("quickSlotStartTime").value + ":00",
-      end_time: DOMHelper.get("quickSlotEndTime").value + ":00",
-    };
+    const form = DOMHelper.get("quickSlotForm");
+    const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
 
-    const result = await this.scheduler.api.createSlot(slotData);
-    if (result) {
-      this.hideModal("quickSlotModal");
-      FormHelper.reset("quickSlotForm");
-      this.scheduler.loadSlots();
+    const startVal = DOMHelper.get("quickSlotStartTime").value;
+    const endVal = DOMHelper.get("quickSlotEndTime").value;
+
+    const startValid = Utils.validateField("quickSlotStartTime", (val) => val.length > 0, "Укажите время начала");
+    const endValid = Utils.validateField("quickSlotEndTime", (val) => val.length > 0, "Укажите время окончания");
+
+    let timeRangeValid = true;
+    if (startValid && endValid) {
+      timeRangeValid = Utils.validateField("quickSlotEndTime", () => startVal < endVal, "Время окончания должно быть позже времени начала");
+    }
+
+    if (!startValid || !endValid || !timeRangeValid) {
+      return;
+    }
+
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+      const slotData = {
+        date: DOMHelper.get("quickSlotDate").value,
+        start_time: DOMHelper.get("quickSlotStartTime").value + ":00",
+        end_time: DOMHelper.get("quickSlotEndTime").value + ":00",
+      };
+
+      const result = await this.scheduler.api.createSlot(slotData);
+      if (result) {
+        Utils.showSuccess("Слот создан успешно");
+        this.hideModal("quickSlotModal");
+        FormHelper.reset("quickSlotForm");
+        this.scheduler.loadSlots();
+      }
+    } catch (error) {
+      Utils.showError(error.message);
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
     }
   }
 
   async updateSlot() {
-    const slotId = DOMHelper.get("editSlotId").value;
+    const form = DOMHelper.get("editSlotForm");
+    const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
+    const deleteBtn = form ? form.querySelector('button.btn-danger') : null;
 
-    const slotData = {
-      date: DOMHelper.get("editSlotDate").value,
-      start_time: DOMHelper.get("editSlotStartTime").value,
-      end_time: DOMHelper.get("editSlotEndTime").value,
-    };
+    const startVal = DOMHelper.get("editSlotStartTime").value;
+    const endVal = DOMHelper.get("editSlotEndTime").value;
+
+    const startValid = Utils.validateField("editSlotStartTime", (val) => val.length > 0, "Укажите время начала");
+    const endValid = Utils.validateField("editSlotEndTime", (val) => val.length > 0, "Укажите время окончания");
+
+    let timeRangeValid = true;
+    if (startValid && endValid) {
+      timeRangeValid = Utils.validateField("editSlotEndTime", () => startVal < endVal, "Время окончания должно быть позже времени начала");
+    }
 
     const companyName = DOMHelper.get("editCompanyName").value.trim();
     const adminEmail = DOMHelper.get("editAdminEmail").value.trim();
     const companyId = DOMHelper.get("editCompanyId").value.trim();
     const downloadEmail = DOMHelper.get("editDownloadEmail").value.trim();
 
+    let bookingFieldsValid = true;
     if (companyName || adminEmail || companyId || downloadEmail) {
-      slotData.is_available = false;
-      slotData.booking = {
-        company_name: companyName,
-        admin_email: adminEmail,
-        company_id: companyId,
-        download_email: downloadEmail,
-      };
+      const companyNameValid = Utils.validateField("editCompanyName", (val) => val.length > 0, "Название компании обязательно");
+      const adminEmailValid = Utils.validateField("editAdminEmail", (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), "Введите корректный email");
+      const companyIdValid = Utils.validateField("editCompanyId", (val) => val.length > 0, "ID компании обязателен");
+      const downloadEmailValid = Utils.validateField("editDownloadEmail", (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), "Введите корректный email");
+
+      bookingFieldsValid = companyNameValid && adminEmailValid && companyIdValid && downloadEmailValid;
     } else {
-      slotData.is_available = true;
-      slotData.booking = null;
+      DOMHelper.get("editCompanyName").classList.remove("is-valid", "is-invalid");
+      DOMHelper.get("editAdminEmail").classList.remove("is-valid", "is-invalid");
+      DOMHelper.get("editCompanyId").classList.remove("is-valid", "is-invalid");
+      DOMHelper.get("editDownloadEmail").classList.remove("is-valid", "is-invalid");
     }
 
-    const completedContainer = DOMHelper.get("editCompletedContainer");
-    if (completedContainer && completedContainer.style.display !== "none") {
-      slotData.completed = DOMHelper.isChecked("editCompleted");
+    if (!startValid || !endValid || !timeRangeValid || !bookingFieldsValid) {
+      return;
     }
 
-    const result = await this.scheduler.api.updateSlot(slotId, slotData);
-    if (result) {
-      this.hideModal("editSlotModal");
-      this.scheduler.loadSlots();
+    if (submitBtn) submitBtn.disabled = true;
+    if (deleteBtn) deleteBtn.disabled = true;
+
+    try {
+      const slotId = DOMHelper.get("editSlotId").value;
+
+      const slotData = {
+        date: DOMHelper.get("editSlotDate").value,
+        start_time: DOMHelper.get("editSlotStartTime").value,
+        end_time: DOMHelper.get("editSlotEndTime").value,
+      };
+
+      if (companyName || adminEmail || companyId || downloadEmail) {
+        slotData.is_available = false;
+        slotData.booking = {
+          company_name: companyName,
+          admin_email: adminEmail,
+          company_id: companyId,
+          download_email: downloadEmail,
+        };
+      } else {
+        slotData.is_available = true;
+        slotData.booking = null;
+      }
+
+      const completedContainer = DOMHelper.get("editCompletedContainer");
+      if (completedContainer && completedContainer.style.display !== "none") {
+        slotData.completed = DOMHelper.isChecked("editCompleted");
+      }
+
+      const result = await this.scheduler.api.updateSlot(slotId, slotData);
+      if (result) {
+        Utils.showSuccess("Слот обновлен успешно");
+        this.hideModal("editSlotModal");
+        this.scheduler.loadSlots();
+      }
+    } catch (error) {
+      Utils.showError(error.message);
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+      if (deleteBtn) deleteBtn.disabled = false;
     }
   }
 
   async bookSlot() {
     const form = DOMHelper.get("bookingForm");
-    const slotId = form.dataset.slotId;
+    const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
 
-    const bookingData = {
-      company_name: DOMHelper.get("companyName").value,
-      admin_email: DOMHelper.get("adminEmail").value,
-      company_id: DOMHelper.get("companyId").value,
-      download_email: DOMHelper.get("downloadEmail").value,
-    };
+    const companyNameValid = Utils.validateField("companyName", (val) => val.length > 0, "Название компании обязательно");
+    const adminEmailValid = Utils.validateField("adminEmail", (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), "Введите корректный email");
+    const companyIdValid = Utils.validateField("companyId", (val) => val.length > 0, "ID компании обязателен");
+    const downloadEmailValid = Utils.validateField("downloadEmail", (val) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), "Введите корректный email");
 
-    const result = await this.scheduler.api.bookSlot(slotId, bookingData);
-    if (result) {
-      this.hideModal("bookingModal");
-      FormHelper.reset("bookingForm");
-      delete form.dataset.slotId;
-      this.scheduler.loadSlots();
+    if (!companyNameValid || !adminEmailValid || !companyIdValid || !downloadEmailValid) {
+      return;
+    }
+
+    if (submitBtn) submitBtn.disabled = true;
+
+    try {
+      const slotId = form.dataset.slotId;
+
+      const bookingData = {
+        company_name: DOMHelper.get("companyName").value,
+        admin_email: DOMHelper.get("adminEmail").value,
+        company_id: DOMHelper.get("companyId").value,
+        download_email: DOMHelper.get("downloadEmail").value,
+      };
+
+      const result = await this.scheduler.api.bookSlot(slotId, bookingData);
+      if (result) {
+        Utils.showSuccess("Слот успешно забронирован");
+        this.hideModal("bookingModal");
+        FormHelper.reset("bookingForm");
+        delete form.dataset.slotId;
+        this.scheduler.loadSlots();
+      }
+    } catch (error) {
+      Utils.showError(error.message);
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
     }
   }
 
   async deleteSlot() {
-    const slotId = DOMHelper.get("editSlotId").value;
-    const result = await this.scheduler.api.deleteSlot(slotId);
-    if (result) {
+    if (!confirm("Вы уверены, что хотите удалить этот слот?")) {
+      return;
+    }
+
+    const form = DOMHelper.get("editSlotForm");
+    const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
+    const deleteBtn = form ? form.querySelector('button.btn-danger') : null;
+    if (submitBtn) submitBtn.disabled = true;
+    if (deleteBtn) deleteBtn.disabled = true;
+
+    try {
+      const slotId = DOMHelper.get("editSlotId").value;
+      await this.scheduler.api.deleteSlot(slotId);
+      Utils.showSuccess("Слот удален успешно");
       this.hideModal("editSlotModal");
       this.scheduler.loadSlots();
+    } catch (error) {
+      Utils.showError(error.message);
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+      if (deleteBtn) deleteBtn.disabled = false;
     }
   }
 
@@ -338,7 +390,7 @@ class Modals {
       DOMHelper.html("connectionResult", "");
 
       const modalElement = DOMHelper.get("yougileSettingsModal");
-      const modal = new bootstrap.Modal(modalElement);
+      const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
       modal.show();
 
       if (settings.enabled) {
@@ -395,13 +447,13 @@ class Modals {
 
       DOMHelper.html(
         "connectionResult",
-        `<div class="alert alert-success">Загружено проектов: ${projects.length}</div>`,
+        Templates.yougileConnectionSuccess(projects.length),
       );
     } catch (error) {
       projectSelect.innerHTML = '<option value="">Ошибка загрузки</option>';
       DOMHelper.html(
         "connectionResult",
-        `<div class="alert alert-danger"><strong>❌ Ошибка подключения</strong><br>${error.message}</div>`,
+        Templates.yougileConnectionError(error.message),
       );
       throw error;
     }
@@ -496,15 +548,7 @@ class Modals {
 
   populateSelect(selectId, items, valueField, textField, placeholder) {
     const select = DOMHelper.get(selectId);
-    select.innerHTML = `<option value="">${placeholder}</option>`;
-
-    items.forEach((item) => {
-      const option = document.createElement("option");
-      option.value = item[valueField];
-      option.textContent = item[textField];
-      select.appendChild(option);
-    });
-
+    select.innerHTML = Templates.selectOptions(items, valueField, textField, placeholder);
     select.disabled = false;
   }
 
@@ -531,12 +575,18 @@ class Modals {
       settings.api_token = apiTokenInput.value;
     }
 
+    const submitBtn = DOMHelper.get("saveYougileSettings");
+    if (submitBtn) submitBtn.disabled = true;
+
     try {
       await this.scheduler.api.updateYougileSettings(settings);
+      Utils.showSuccess("Настройки Yougile сохранены");
       apiTokenInput.value = "";
       this.hideModal("yougileSettingsModal");
     } catch (error) {
       Utils.showError("Ошибка сохранения настроек: " + error.message);
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
     }
   }
 
@@ -575,4 +625,51 @@ class Modals {
       await this.loadColumns(boardId);
     }
   }
+
+  openAdminAuthModal() {
+    const modalElement = DOMHelper.get("adminAuthModal");
+    if (!modalElement) return;
+    const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+    modal.show();
+  }
+
+  openReglamentModal() {
+    const modalElement = DOMHelper.get("reglamentModal");
+    if (!modalElement) return;
+    const modal = bootstrap.Modal.getOrCreateInstance(modalElement);
+    modal.show();
+  }
+
+  async handleAdminAuth() {
+    const form = DOMHelper.get("adminAuthForm");
+    const submitBtn = form ? form.querySelector('button[type="submit"]') : null;
+    if (submitBtn) submitBtn.disabled = true;
+
+    const password = document.getElementById("password").value;
+
+    try {
+      const data = await this.scheduler.api.adminAuth(password);
+      this.hideModal("adminAuthModal");
+      this.scheduler.onAuthSuccess(data);
+    } catch (error) {
+      console.error("Auth error:", error);
+      Utils.showError(error.message || "Ошибка авторизации");
+      this.shakePasswordField();
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+  }
+
+  shakePasswordField() {
+    const passwordField = document.getElementById("password");
+    if (!passwordField) return;
+    passwordField.value = "";
+    passwordField.focus();
+    passwordField.classList.add("shake");
+    setTimeout(() => {
+      passwordField.classList.remove("shake");
+    }, 500);
+  }
 }
+
+export { Modals };

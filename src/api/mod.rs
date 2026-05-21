@@ -41,6 +41,7 @@ pub fn routes(scheduler: Arc<Scheduler>, yougile: Arc<YougileClient>) -> Router 
         .route("/api/slots/{id}/book", post(slots::book_slot_handler))
         .route("/api/auth/admin", post(auth::admin_auth_handler))
         .route("/api/auth/check", get(auth::check_auth_handler))
+        .route("/api/auth/logout", post(auth::logout_handler))
         .route("/{*path}", get(static_handler));
 
     let protected_routes = Router::new()
@@ -102,8 +103,8 @@ async fn static_handler(Path(path): Path<String>) -> Result<Response, (StatusCod
             };
 
             let headers = axum::http::HeaderMap::from_iter([(
-                axum::http::HeaderName::from_static("content-type"),
-                content_type.parse().unwrap(),
+                axum::http::header::CONTENT_TYPE,
+                content_type.parse().expect("content type is a valid MIME type"),
             )]);
 
             Ok((headers, axum::body::Bytes::from_static(file.contents())).into_response())

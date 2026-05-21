@@ -7,7 +7,6 @@ use axum::{
     http::StatusCode,
 };
 use serde::{Deserialize, Serialize};
-use tracing::info;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct YougileConfigResponse {
@@ -50,18 +49,14 @@ pub struct UsersQuery {
 pub async fn get_yougile_config_handler(
     State(state): State<AppState>,
 ) -> Json<YougileConfigResponse> {
-    Json(state.yougile.config().await.into())
+    Json(state.yougile.config().into())
 }
 
 pub async fn update_yougile_config_handler(
     State(state): State<AppState>,
-    Json(mut new_config): Json<YougileConfig>,
+    Json(config): Json<YougileConfig>,
 ) -> Result<StatusCode, AppError> {
-    if new_config.api_token.is_none() {
-        new_config.api_token = state.yougile.config().await.api_token;
-    }
-    state.yougile.update_config(new_config).await?;
-    info!("Yougile settings updated successfully");
+    state.yougile.update_config(config).await?;
     Ok(StatusCode::OK)
 }
 
@@ -69,7 +64,6 @@ pub async fn get_projects_handler(
     State(state): State<AppState>,
 ) -> Result<Json<Vec<ProjectInfo>>, AppError> {
     let projects = state.yougile.load_projects().await?;
-    info!("Loaded {} Yougile projects", projects.len());
     Ok(Json(projects))
 }
 
@@ -78,11 +72,6 @@ pub async fn get_boards_handler(
     Query(query): Query<BoardsQuery>,
 ) -> Result<Json<Vec<BoardInfo>>, AppError> {
     let boards = state.yougile.load_boards(&query.project_id).await?;
-    info!(
-        "Loaded {} Yougile boards for project {}",
-        boards.len(),
-        query.project_id
-    );
     Ok(Json(boards))
 }
 
@@ -91,11 +80,6 @@ pub async fn get_columns_handler(
     Query(query): Query<ColumnsQuery>,
 ) -> Result<Json<Vec<ColumnInfo>>, AppError> {
     let columns = state.yougile.load_columns(&query.board_id).await?;
-    info!(
-        "Loaded {} Yougile columns for board {}",
-        columns.len(),
-        query.board_id
-    );
     Ok(Json(columns))
 }
 
@@ -104,10 +88,5 @@ pub async fn get_users_handler(
     Query(query): Query<UsersQuery>,
 ) -> Result<Json<Vec<UserInfo>>, AppError> {
     let users = state.yougile.load_users(&query.project_id).await?;
-    info!(
-        "Loaded {} Yougile users for project {}",
-        users.len(),
-        query.project_id
-    );
     Ok(Json(users))
 }

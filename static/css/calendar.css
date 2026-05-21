@@ -37,6 +37,7 @@
     border-bottom: 1px solid var(--calendar-border);
     display: flex;
     flex-direction: column;
+    transition: background-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
 .calendar-day:nth-child(7n) {
@@ -49,7 +50,23 @@
 }
 
 .calendar-day.today {
-    background-color: #e3f2fd;
+    background-color: #f0f8ff;
+    border: 2px solid #007bff !important;
+    border-radius: 4px;
+    box-shadow: 0 0 8px rgba(0, 123, 255, 0.25);
+    z-index: 2;
+}
+
+.calendar-header.weekend {
+    color: var(--danger-color);
+}
+
+.calendar-day.weekend {
+    background-color: #fff9f9;
+}
+
+.calendar-day.weekend.other-month {
+    background-color: #f7f1f1;
 }
 
 .calendar-day-number.disabled-day {
@@ -114,11 +131,13 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    transition: background-color 0.2s ease;
+    transition: background-color 0.2s ease, transform 0.15s ease, box-shadow 0.15s ease, opacity 0.2s ease;
 }
 
 .calendar-slot:hover {
     background-color: var(--slot-available-hover);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .calendar-slot.available,
@@ -146,3 +165,6 @@
     background-color: var(--slot-past-available-bg);
     color: var(--secondary-color);
 }
+
+
+

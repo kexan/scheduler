@@ -5,8 +5,6 @@ use tracing::debug;
 
 use crate::error::{AppError, Result};
 
-const SETTINGS_PATH: &str = "data/yougile_config.json";
-
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct YougileConfig {
     pub enabled: bool,
@@ -33,23 +31,24 @@ impl Default for YougileConfig {
 }
 
 impl YougileConfig {
-    pub async fn save(&self) -> Result<()> {
+    pub async fn save(&self, path: &str) -> Result<()> {
         let json = serde_json::to_vec_pretty(self).map_err(AppError::Json)?;
-        crate::utils::atomic_write(Path::new(SETTINGS_PATH), &json).await
+        crate::utils::atomic_write(Path::new(path), &json).await
     }
 }
 
-pub async fn load_yougile_settings() -> Result<YougileConfig> {
-    let path = Path::new(SETTINGS_PATH);
-    if !path.exists() {
-        debug!(
-            "Yougile settings file {} does not exist, using defaults",
-            SETTINGS_PATH
-        );
-        return Ok(YougileConfig::default());
-    }
-
-    let content = read_to_string(SETTINGS_PATH).await.map_err(AppError::Io)?;
+pub async fn load_yougile_config(path: &str) -> Result<YougileConfig> {
+    let content = match read_to_string(path).await {
+        Ok(c) => c,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            debug!(
+                "Yougile settings file {} does not exist, using defaults",
+                path
+            );
+            return Ok(YougileConfig::default());
+        }
+        Err(e) => return Err(AppError::Io(e)),
+    };
 
     serde_json::from_str(&content).map_err(AppError::Json)
 }

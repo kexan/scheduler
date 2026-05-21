@@ -157,3 +157,69 @@ body {
 .d-flex#adminControls.show {
     display: flex !important;
 }
+
+
+
+/* Адаптивный мобильный вид */
+@media (max-width: 768px) {
+    html, body {
+        overflow: auto;
+        height: auto;
+    }
+    
+    #calendarPage {
+        overflow: visible;
+        height: auto;
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    
+    #calendarContainer {
+        overflow: visible;
+    }
+
+    .calendar-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        border: none;
+    }
+
+    .calendar-header {
+        display: none; /* Скрываем заголовки дней на мобильном */
+    }
+
+    .calendar-day {
+        border: 1px solid var(--calendar-border) !important;
+        border-radius: var(--calendar-radius);
+        margin-bottom: 5px;
+        background-color: white;
+        padding: 12px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    }
+    
+    .calendar-day.other-month {
+        display: none; /* Скрываем дни прошлых месяцев */
+    }
+
+    .calendar-day-number {
+        font-size: 1rem;
+        border-bottom: 1px solid #eee;
+        padding-bottom: 6px;
+        margin-bottom: 8px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .calendar-slots.with-scroll {
+        max-height: none; /* Позволяем слотам занимать всю высоту */
+    }
+    
+    /* Убираем абсолютное позиционирование для чекбоксов */
+    .day-checkbox {
+        position: static;
+        padding: 0;
+        margin-left: 8px;
+    }
+}

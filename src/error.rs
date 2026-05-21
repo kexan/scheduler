@@ -48,7 +48,14 @@ impl IntoResponse for AppError {
             AppError::Unauthorized => (StatusCode::UNAUTHORIZED, self.to_string()),
             AppError::SlotNotFound => (StatusCode::NOT_FOUND, self.to_string()),
             AppError::SlotAlreadyBooked => (StatusCode::CONFLICT, self.to_string()),
-            _ => (StatusCode::INTERNAL_SERVER_ERROR, self.to_string()),
+            AppError::InvalidTimeRange => (StatusCode::BAD_REQUEST, self.to_string()),
+            other => {
+                tracing::error!("Internal server error: {:?}", other);
+                (
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Внутренняя ошибка сервера".to_string(),
+                )
+            }
         };
 
         let body = Json(json!({
@@ -62,5 +69,38 @@ impl IntoResponse for AppError {
 impl From<YougileError> for AppError {
     fn from(e: YougileError) -> Self {
         AppError::Yougile(e.to_string())
+    }
+}
+pub trait IsFatalError {
+    fn is_fatal(&self) -> bool;
+}
+
+impl IsFatalError for AppError {
+    fn is_fatal(&self) -> bool {
+        match self {
+            AppError::Io(_) | AppError::Json(_) => true,
+            AppError::InvalidUuid(_)
+            | AppError::InvalidTimeFormat(_)
+            | AppError::InvalidTimeRange => true,
+            AppError::SlotNotFound | AppError::SlotAlreadyBooked => true,
+            AppError::Unauthorized => true,
+            AppError::Yougile(msg) => {
+                let msg_lower = msg.to_lowercase();
+                if msg_lower.contains("401") || msg_lower.contains("unauthorized") {
+                    return true;
+                }
+                if msg_lower.contains("403") || msg_lower.contains("forbidden") {
+                    return true;
+                }
+                if msg_lower.contains("400") || msg_lower.contains("bad request") {
+                    return true;
+                }
+                if msg_lower.contains("404") || msg_lower.contains("not found") {
+                    return true;
+                }
+                false
+            }
+            AppError::Other(_) => false,
+        }
     }
 }

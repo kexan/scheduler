@@ -3,6 +3,7 @@
   packages = [
     pkgs.openssl
     pkgs.pkg-config
+    pkgs.nodejs
   ];
 
   languages = {
