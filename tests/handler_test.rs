@@ -173,6 +173,120 @@ async fn handler_get_slots_with_date_filter() {
     assert_eq!(slots[0]["date"], "2026-07-01");
 }
 
+#[tokio::test]
+#[serial]
+async fn handler_get_slots_with_search_filter() {
+    let app = create_test_app().await;
+    let cookie = admin_login(&app).await;
+
+    let create_resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/slots")
+                .method("POST")
+                .header("content-type", "application/json")
+                .header("cookie", &cookie)
+                .body(Body::from(make_slot_body("2026-07-01", "10:00", "11:00")))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let body = axum::body::to_bytes(create_resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let slot: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let slot_id = slot["id"].as_str().unwrap();
+
+    // Create a second slot (that won't be booked/matched)
+    app.clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/slots")
+                .method("POST")
+                .header("content-type", "application/json")
+                .header("cookie", &cookie)
+                .body(Body::from(make_slot_body("2026-07-02", "11:00", "12:00")))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // Book the first slot with company details
+    app.clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/slots/{}/book", slot_id))
+                .method("POST")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"company_name":"AlphaOmega","admin_email":"admin@alpha.com","company_id":"ao-999","download_email":"dl@alpha.com"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // Search by search=alpha
+    let resp_q = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/slots?search=alpha")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp_q.status(), StatusCode::OK);
+    let body_q = axum::body::to_bytes(resp_q.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let slots_q: Vec<serde_json::Value> = serde_json::from_slice(&body_q).unwrap();
+    assert_eq!(slots_q.len(), 1);
+    assert_eq!(slots_q[0]["booking"]["company_name"], "AlphaOmega");
+
+    // Search by search=AlphaOmega (case-insensitive)
+    let resp_comp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/slots?search=AlphaOmega")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp_comp.status(), StatusCode::OK);
+    let body_comp = axum::body::to_bytes(resp_comp.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let slots_comp: Vec<serde_json::Value> = serde_json::from_slice(&body_comp).unwrap();
+    assert_eq!(slots_comp.len(), 1);
+
+    // Search for non-existent company
+    let resp_none = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/slots?search=NonexistentCorp")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp_none.status(), StatusCode::OK);
+    let body_none = axum::body::to_bytes(resp_none.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let slots_none: Vec<serde_json::Value> = serde_json::from_slice(&body_none).unwrap();
+    assert!(slots_none.is_empty());
+}
+
 // ── POST /api/slots ─────────────────────────────────────────────────
 
 #[tokio::test]

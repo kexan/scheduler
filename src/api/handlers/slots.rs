@@ -14,6 +14,7 @@ use uuid::Uuid;
 pub struct SlotsQuery {
     pub from: Option<NaiveDate>,
     pub to: Option<NaiveDate>,
+    pub search: Option<String>,
 }
 
 async fn spawn_yougile_sync(state: AppState, slot: TimeSlot) {
@@ -41,7 +42,27 @@ pub async fn get_slots_handler(
     State(state): State<AppState>,
     Query(query): Query<SlotsQuery>,
 ) -> Result<Json<Vec<TimeSlot>>, AppError> {
-    let slots = state.scheduler.get_slots_in_range(query.from, query.to);
+    let mut slots = state.scheduler.get_slots_in_range(query.from, query.to);
+
+    if let Some(search) = query.search {
+        let search_lower = search.trim().to_lowercase();
+        if !search_lower.is_empty() {
+            slots.retain(|slot| {
+                if let Some(booking) = &slot.booking {
+                    booking.company_name.to_lowercase().contains(&search_lower)
+                        || booking.company_id.to_lowercase().contains(&search_lower)
+                        || booking.admin_email.to_lowercase().contains(&search_lower)
+                        || booking
+                            .download_email
+                            .to_lowercase()
+                            .contains(&search_lower)
+                } else {
+                    false
+                }
+            });
+        }
+    }
+
     Ok(Json(slots))
 }
 
