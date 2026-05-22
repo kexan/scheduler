@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Utils } from '../utils.js';
-import { Calendar } from '../calendar.js';
+import { Utils } from '../static/js/utils.js';
+import { Calendar } from '../static/js/calendar.js';
 
 describe('calendar.js', () => {
   let schedulerMock;

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Api } from '../api.js';
+import { Api } from '../static/js/api.js';
 
 describe('api.js', () => {
   let api;

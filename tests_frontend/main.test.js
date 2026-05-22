@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Scheduler } from '../main.js';
-import { Utils } from '../utils.js';
+import { Scheduler } from '../static/js/main.js';
+import { Utils } from '../static/js/utils.js';
 
 describe('main.js Scheduler search coordination', () => {
   let scheduler;

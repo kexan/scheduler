@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Utils, DOMHelper, ButtonHelper } from '../utils.js';
+import { Utils, DOMHelper, ButtonHelper } from '../static/js/utils.js';
 
 describe('utils.js', () => {
   describe('Utils class', () => {
