@@ -78,6 +78,56 @@ class Templates {
       .join("");
   }
 
+  static searchResultSlot(slot, statusText, isPastDate) {
+    const formattedDate = Utils.formatDate(slot.date);
+    const formattedTime = `${Utils.formatTime(slot.start_time)} - ${Utils.formatTime(slot.end_time)}`;
+
+    let info = "";
+    if (slot.booking) {
+      info = `
+        <div class="mt-2 pt-2 border-top">
+          <strong>Компания:</strong> ${Utils.escapeHtml(slot.booking.company_name)}<br>
+          <strong>ID:</strong> ${Utils.escapeHtml(slot.booking.company_id)}<br>
+          <strong>Админ:</strong> ${Utils.escapeHtml(slot.booking.admin_email)}
+        </div>
+      `;
+    } else {
+      info = isPastDate
+        ? '<div class="mt-2 text-muted italic">Слот в прошлом</div>'
+        : '<div class="mt-2 text-success fw-bold">Свободно для записи</div>';
+    }
+
+    let borderClass = "border-primary";
+    let bgLight = "bg-light";
+    if (slot.completed) {
+      borderClass = "border-success";
+      bgLight = "bg-success-subtle";
+    } else if (!slot.is_available) {
+      borderClass = "border-warning";
+      bgLight = "bg-warning-subtle";
+    } else if (isPastDate) {
+      borderClass = "border-secondary";
+      bgLight = "bg-light";
+    }
+
+    return `
+      <div class="col-md-6 col-lg-4">
+        <div class="card search-slot-item h-100 border-2 ${borderClass} shadow-sm" data-slot-id="${slot.id}" style="cursor: pointer;">
+          <div class="card-header ${bgLight} d-flex justify-content-between align-items-center">
+            <span class="badge ${slot.is_available ? 'bg-primary' : (slot.completed ? 'bg-success' : 'bg-warning text-dark')}">${statusText}</span>
+            <small class="text-secondary fw-semibold"><i class="bi bi-calendar-event"></i> ${formattedDate}</small>
+          </div>
+          <div class="card-body d-flex flex-column">
+            <h5 class="card-title mb-2 text-dark"><i class="bi bi-clock"></i> ${formattedTime}</h5>
+            <div class="card-text small text-secondary flex-grow-1">
+              ${info}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   static viewSlotModalContent(slot, statusText) {
     let html = `
       <div class="mb-3">

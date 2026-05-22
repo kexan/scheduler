@@ -35,6 +35,13 @@ describe('utils.js', () => {
       expect(alerts[0].textContent).toContain('Hello World');
       expect(alerts[0].className).toContain('alert-success');
     });
+
+    it('escapeHtml should escape HTML special characters', () => {
+      expect(Utils.escapeHtml('<div>Hello & "World"</div>')).toBe('&lt;div&gt;Hello &amp; &quot;World&quot;&lt;/div&gt;');
+      expect(Utils.escapeHtml("o'reilly")).toBe('o&#039;reilly');
+      expect(Utils.escapeHtml(null)).toBe('');
+      expect(Utils.escapeHtml(undefined)).toBe('');
+    });
   });
 
   describe('DOMHelper class', () => {

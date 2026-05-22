@@ -430,49 +430,62 @@ class Calendar {
     return `${actualYear}-${monthStr}-${dayStr}`;
   }
 
+  handleSlotClick(slotId) {
+    const slotItem = this.slots.find((s) => s.id === slotId);
+    if (!slotItem) return;
+
+    if (this.isAdminMode) {
+      this.scheduler.modals.openEditModal(slotId);
+    } else if (slotItem.is_available && this.isDateValidForSlot(slotItem.date)) {
+      this.scheduler.modals.openBookingModal(slotId);
+    } else if (slotItem.is_available) {
+      Utils.showError(
+        "Нельзя записываться на слоты в текущие и прошедшие даты",
+      );
+    } else {
+      this.scheduler.modals.openViewSlotModal(slotId);
+    }
+  }
+
   setupDelegatedEvents() {
     const container = document.getElementById("calendarContainer");
-    if (!container) return;
-
-    container.addEventListener("click", (e) => {
-      // 1. Admin add slot button click
-      const addBtn = e.target.closest(".admin-add-slot-btn");
-      if (addBtn) {
-        e.stopPropagation();
-        const date = addBtn.dataset.date;
-        this.scheduler.modals.openQuickSlotModal(date);
-        return;
-      }
-
-      // 2. Calendar slot click
-      const slot = e.target.closest(".calendar-slot");
-      if (slot && !slot.classList.contains("admin-add-slot")) {
-        const slotId = slot.dataset.slotId;
-        const slotItem = this.slots.find((s) => s.id === slotId);
-        if (!slotItem) return;
-
-        if (this.isAdminMode) {
-          this.scheduler.modals.openEditModal(slotId);
-        } else if (slotItem.is_available && this.isDateValidForSlot(slotItem.date)) {
-          this.scheduler.modals.openBookingModal(slotId);
-        } else if (slotItem.is_available) {
-          Utils.showError(
-            "Нельзя записываться на слоты в текущие и прошедшие даты",
-          );
-        } else {
-          this.scheduler.modals.openViewSlotModal(slotId);
+    if (container) {
+      container.addEventListener("click", (e) => {
+        // 1. Admin add slot button click
+        const addBtn = e.target.closest(".admin-add-slot-btn");
+        if (addBtn) {
+          e.stopPropagation();
+          const date = addBtn.dataset.date;
+          this.scheduler.modals.openQuickSlotModal(date);
+          return;
         }
-        return;
-      }
-    });
 
-    container.addEventListener("change", (e) => {
-      // 3. Day checkbox change (for copy mode)
-      if (e.target.matches(".day-checkbox input")) {
-        e.stopPropagation();
-        this.toggleDayForCopy(e.target.dataset.date, e.target.checked);
-      }
-    });
+        // 2. Calendar slot click
+        const slot = e.target.closest(".calendar-slot, .search-slot-item");
+        if (slot && !slot.classList.contains("admin-add-slot")) {
+          this.handleSlotClick(slot.dataset.slotId);
+          return;
+        }
+      });
+
+      container.addEventListener("change", (e) => {
+        // 3. Day checkbox change (for copy mode)
+        if (e.target.matches(".day-checkbox input")) {
+          e.stopPropagation();
+          this.toggleDayForCopy(e.target.dataset.date, e.target.checked);
+        }
+      });
+    }
+
+    const searchContainer = document.getElementById("searchResultsContainer");
+    if (searchContainer) {
+      searchContainer.addEventListener("click", (e) => {
+        const slot = e.target.closest(".calendar-slot, .search-slot-item");
+        if (slot) {
+          this.handleSlotClick(slot.dataset.slotId);
+        }
+      });
+    }
   }
 
 

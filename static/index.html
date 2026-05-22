@@ -23,6 +23,7 @@
                         <i class="bi bi-clock"></i>
                         Время указано в часовом поясе МСК: <span id="currentTimeMSK"></span>
                     </small>
+                    <input type="text" id="slotSearchInput" class="form-control form-control-sm" placeholder="Поиск компании..." style="width: 220px;">
                     <button id="reglamentBtn" class="btn btn-outline-info btn-sm">📋 Регламент миграции</button>
                     <button id="adminToggle" class="btn btn-outline-secondary btn-sm">🗝️</button>
                 </div>
@@ -63,9 +64,9 @@
 
         <div class="row">
             <div class="col-12">
-                <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-                    <h5>📅 Календарь слотов</h5>
-                    <div class="d-flex gap-2 align-items-center">
+                <div id="calendarHeaderSection" class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+                    <h5 id="calendarTitle">📅 Календарь слотов</h5>
+                    <div id="monthPagination" class="d-flex gap-2 align-items-center">
                         <button id="prevMonth" class="btn btn-outline-primary btn-sm">◀</button>
                         <span id="currentMonth" class="fw-bold align-self-center"></span>
                         <button id="nextMonth" class="btn btn-outline-primary btn-sm">▶</button>
@@ -108,6 +109,24 @@
                     </div>
                 </div>
                   <div id="calendarContainer" class="mb-4"></div>
+                  <div id="searchResultsContainer" class="mb-4" style="display: none; flex: 1; min-height: 0; overflow-y: auto;">
+                      <div class="card border-0">
+                          <div class="card-header bg-light d-flex justify-content-between align-items-center rounded-top border">
+                              <div class="d-flex align-items-center gap-2">
+                                  <h6 class="mb-0 fw-bold">🔍 Результаты поиска</h6>
+                                  <span id="searchResultsCount" class="badge bg-secondary">Найдено: 0</span>
+                              </div>
+                              <button id="closeSearchBtn" class="btn btn-outline-danger btn-sm d-flex align-items-center gap-1">
+                                  <i class="bi bi-x-lg"></i> Сбросить поиск
+                              </button>
+                          </div>
+                          <div class="card-body px-0 py-3">
+                              <div id="searchResultsList" class="row g-3">
+                                  <!-- Search slots list items -->
+                              </div>
+                          </div>
+                      </div>
+                  </div>
                 </div>
             </div>
         </div>
