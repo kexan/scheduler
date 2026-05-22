@@ -13,7 +13,7 @@ const SESSION_DURATION: Duration = Duration::from_secs(3600);
 
 #[derive(Clone)]
 pub struct AdminToken {
-    tokens: Arc<RwLock<HashMap<Vec<u8>, DateTime<Utc>>>>,
+    tokens: Arc<RwLock<HashMap<[u8; 32], DateTime<Utc>>>>,
 }
 
 impl Default for AdminToken {
@@ -46,8 +46,6 @@ impl AdminToken {
 
                 if removed > 0 {
                     info!("Cleaned up {} expired sessions", removed);
-                } else {
-                    debug!("No expired sessions to clean up");
                 }
             }
         });
@@ -55,16 +53,19 @@ impl AdminToken {
         Self { tokens }
     }
 
-    fn hash_token(token: &str) -> Vec<u8> {
+    fn hash_token(token: &str) -> [u8; 32] {
         let mut hasher = Sha256::new();
         hasher.update(token.as_bytes());
-        hasher.finalize().to_vec()
+        hasher.finalize().into()
     }
 
     pub fn create_session(&self) -> String {
         let token = Uuid::new_v4().to_string();
         let hash = Self::hash_token(&token);
-        let expires = Utc::now() + chrono::Duration::seconds(SESSION_DURATION.as_secs() as i64);
+
+        let chrono_dur = chrono::Duration::from_std(SESSION_DURATION)
+            .unwrap_or_else(|_| chrono::Duration::hours(1));
+        let expires = Utc::now() + chrono_dur;
 
         self.tokens.write().insert(hash, expires);
 
@@ -77,18 +78,12 @@ impl AdminToken {
 
     pub fn verify(&self, token: &str) -> bool {
         let hash = Self::hash_token(token);
-        let now = Utc::now();
 
-        if let Some(expiration) = self.tokens.read().get(&hash) {
-            if &now <= expiration {
-                return true;
-            }
-        } else {
-            return false;
-        }
-
-        self.tokens.write().remove(&hash);
-        false
+        self.tokens
+            .read()
+            .get(&hash)
+            .map(|expires| Utc::now() <= *expires)
+            .unwrap_or(false)
     }
 
     pub fn check_auth(&self, cookie_header: Option<&str>) -> Result<(), AppError> {
