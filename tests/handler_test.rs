@@ -272,10 +272,12 @@ async fn handler_create_slot_invalid_time_range() {
         .await
         .unwrap();
     let err: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    assert!(err["error"]
-        .as_str()
-        .unwrap()
-        .contains("Invalid time range"));
+    assert!(
+        err["error"]
+            .as_str()
+            .unwrap()
+            .contains("Invalid time range")
+    );
 }
 
 // ── POST /api/slots/{id}/book ───────────────────────────────────────
@@ -350,7 +352,9 @@ async fn handler_book_slot_past_date_rejected() {
         .await
         .unwrap();
 
-    let body = axum::body::to_bytes(create_resp.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(create_resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let slot: serde_json::Value = serde_json::from_slice(&body).unwrap();
     let slot_id = slot["id"].as_str().unwrap();
 
@@ -368,12 +372,16 @@ async fn handler_book_slot_past_date_rejected() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let err: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    assert!(err["error"]
-        .as_str()
-        .unwrap()
-        .contains("Внутренняя ошибка сервера"));
+    assert!(
+        err["error"]
+            .as_str()
+            .unwrap()
+            .contains("Внутренняя ошибка сервера")
+    );
 }
 
 #[tokio::test]
@@ -744,7 +752,9 @@ async fn handler_logout_success() {
         )
         .await
         .unwrap();
-    let body = axum::body::to_bytes(check_resp.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(check_resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let result: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(result["authenticated"], true);
 
@@ -764,7 +774,9 @@ async fn handler_logout_success() {
     assert_eq!(logout_resp.status(), StatusCode::OK);
     assert!(logout_resp.headers().contains_key("set-cookie"));
 
-    let body = axum::body::to_bytes(logout_resp.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(logout_resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let result: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(result["message"], "Выход выполнен");
 
@@ -779,7 +791,9 @@ async fn handler_logout_success() {
         )
         .await
         .unwrap();
-    let body = axum::body::to_bytes(check_resp.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(check_resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let result: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(result["authenticated"], false);
 }
@@ -896,6 +910,100 @@ async fn handler_update_yougile_settings() {
     let settings: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(settings["enabled"], true);
     assert_eq!(settings["api_url"], "https://test.yougile.com");
+}
+
+#[tokio::test]
+#[serial]
+async fn handler_update_yougile_settings_unauthorized() {
+    let app = create_test_app().await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/yougile/settings")
+                .method("PUT")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"enabled":true,"api_url":"https://test.yougile.com"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+#[serial]
+async fn handler_get_yougile_projects_unauthorized() {
+    let app = create_test_app().await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/yougile/projects")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+#[serial]
+async fn handler_get_yougile_boards_unauthorized() {
+    let app = create_test_app().await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/yougile/boards?project_id=test-project")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+#[serial]
+async fn handler_get_yougile_columns_unauthorized() {
+    let app = create_test_app().await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/yougile/columns?board_id=test-board")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+#[serial]
+async fn handler_get_yougile_users_unauthorized() {
+    let app = create_test_app().await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/yougile/users?project_id=test-project")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
 
 // ── Full CRUD flow ──────────────────────────────────────────────────
