@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Api } from '../api.js';
+import { Api } from '../static/js/api.js';
 
 describe('api.js', () => {
   let api;
@@ -104,6 +104,44 @@ describe('api.js', () => {
       });
 
       await expect(api.getYougileSettings()).rejects.toThrow('Unauthorized');
+    });
+  });
+
+  describe('getSlots', () => {
+    it('should request correct URL with from and to parameters', async () => {
+      globalThis.fetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'Content-Type': 'application/json' }),
+        json: async () => [],
+      });
+
+      await api.getSlots('2026-05-21', '2026-05-22');
+
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/slots?from=2026-05-21&to=2026-05-22', expect.any(Object));
+    });
+
+    it('should request correct URL with only search query parameter', async () => {
+      globalThis.fetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'Content-Type': 'application/json' }),
+        json: async () => [],
+      });
+
+      await api.getSlots(null, null, 'Google');
+
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/slots?search=Google', expect.any(Object));
+    });
+
+    it('should encode URL parameters correctly', async () => {
+      globalThis.fetch.mockResolvedValueOnce({
+        ok: true,
+        headers: new Headers({ 'Content-Type': 'application/json' }),
+        json: async () => [],
+      });
+
+      await api.getSlots(null, null, 'Test & Co');
+
+      expect(globalThis.fetch).toHaveBeenCalledWith('/api/slots?search=Test%20%26%20Co', expect.any(Object));
     });
   });
 });

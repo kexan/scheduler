@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Utils } from '../utils.js';
-import { Calendar } from '../calendar.js';
+import { Utils } from '../static/js/utils.js';
+import { Calendar } from '../static/js/calendar.js';
 
 describe('calendar.js', () => {
   let schedulerMock;
@@ -42,6 +42,7 @@ describe('calendar.js', () => {
     // Setup DOM elements needed for calendar rendering
     document.body.innerHTML = `
       <div id="calendarContainer"></div>
+      <div id="searchResultsContainer"></div>
       <div id="currentMonth"></div>
       <button id="copySchedule" disabled></button>
       <button id="clearSelection"></button>
@@ -149,6 +150,23 @@ describe('calendar.js', () => {
       const slot = document.querySelector('[data-slot-id="slot-1"]');
       slot.click();
       expect(schedulerMock.modals.openEditModal).toHaveBeenCalledWith('slot-1');
+    });
+
+    it('should trigger correct modals when clicking search result slot items', () => {
+      calendar.isAdminMode = false;
+      calendar.slots = [
+        { id: 'search-slot-1', date: '2026-05-22', start_time: '10:00:00', end_time: '11:00:00', is_available: true }
+      ];
+      
+      const searchContainer = document.getElementById('searchResultsContainer');
+      searchContainer.innerHTML = `
+        <div class="search-slot-item" data-slot-id="search-slot-1">Test Slot Card</div>
+      `;
+
+      const searchItem = searchContainer.querySelector('[data-slot-id="search-slot-1"]');
+      searchItem.click();
+
+      expect(schedulerMock.modals.openBookingModal).toHaveBeenCalledWith('search-slot-1');
     });
   });
 });

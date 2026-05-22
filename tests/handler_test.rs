@@ -173,6 +173,120 @@ async fn handler_get_slots_with_date_filter() {
     assert_eq!(slots[0]["date"], "2026-07-01");
 }
 
+#[tokio::test]
+#[serial]
+async fn handler_get_slots_with_search_filter() {
+    let app = create_test_app().await;
+    let cookie = admin_login(&app).await;
+
+    let create_resp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/slots")
+                .method("POST")
+                .header("content-type", "application/json")
+                .header("cookie", &cookie)
+                .body(Body::from(make_slot_body("2026-07-01", "10:00", "11:00")))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    let body = axum::body::to_bytes(create_resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let slot: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    let slot_id = slot["id"].as_str().unwrap();
+
+    // Create a second slot (that won't be booked/matched)
+    app.clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/slots")
+                .method("POST")
+                .header("content-type", "application/json")
+                .header("cookie", &cookie)
+                .body(Body::from(make_slot_body("2026-07-02", "11:00", "12:00")))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // Book the first slot with company details
+    app.clone()
+        .oneshot(
+            Request::builder()
+                .uri(format!("/api/slots/{}/book", slot_id))
+                .method("POST")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"company_name":"AlphaOmega","admin_email":"admin@alpha.com","company_id":"ao-999","download_email":"dl@alpha.com"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    // Search by search=alpha
+    let resp_q = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/slots?search=alpha")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp_q.status(), StatusCode::OK);
+    let body_q = axum::body::to_bytes(resp_q.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let slots_q: Vec<serde_json::Value> = serde_json::from_slice(&body_q).unwrap();
+    assert_eq!(slots_q.len(), 1);
+    assert_eq!(slots_q[0]["booking"]["company_name"], "AlphaOmega");
+
+    // Search by search=AlphaOmega (case-insensitive)
+    let resp_comp = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/slots?search=AlphaOmega")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp_comp.status(), StatusCode::OK);
+    let body_comp = axum::body::to_bytes(resp_comp.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let slots_comp: Vec<serde_json::Value> = serde_json::from_slice(&body_comp).unwrap();
+    assert_eq!(slots_comp.len(), 1);
+
+    // Search for non-existent company
+    let resp_none = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .uri("/api/slots?search=NonexistentCorp")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(resp_none.status(), StatusCode::OK);
+    let body_none = axum::body::to_bytes(resp_none.into_body(), usize::MAX)
+        .await
+        .unwrap();
+    let slots_none: Vec<serde_json::Value> = serde_json::from_slice(&body_none).unwrap();
+    assert!(slots_none.is_empty());
+}
+
 // ── POST /api/slots ─────────────────────────────────────────────────
 
 #[tokio::test]
@@ -272,10 +386,12 @@ async fn handler_create_slot_invalid_time_range() {
         .await
         .unwrap();
     let err: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    assert!(err["error"]
-        .as_str()
-        .unwrap()
-        .contains("Invalid time range"));
+    assert!(
+        err["error"]
+            .as_str()
+            .unwrap()
+            .contains("Invalid time range")
+    );
 }
 
 // ── POST /api/slots/{id}/book ───────────────────────────────────────
@@ -350,7 +466,9 @@ async fn handler_book_slot_past_date_rejected() {
         .await
         .unwrap();
 
-    let body = axum::body::to_bytes(create_resp.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(create_resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let slot: serde_json::Value = serde_json::from_slice(&body).unwrap();
     let slot_id = slot["id"].as_str().unwrap();
 
@@ -368,12 +486,16 @@ async fn handler_book_slot_past_date_rejected() {
         .unwrap();
 
     assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
-    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let err: serde_json::Value = serde_json::from_slice(&body).unwrap();
-    assert!(err["error"]
-        .as_str()
-        .unwrap()
-        .contains("Внутренняя ошибка сервера"));
+    assert!(
+        err["error"]
+            .as_str()
+            .unwrap()
+            .contains("Внутренняя ошибка сервера")
+    );
 }
 
 #[tokio::test]
@@ -744,7 +866,9 @@ async fn handler_logout_success() {
         )
         .await
         .unwrap();
-    let body = axum::body::to_bytes(check_resp.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(check_resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let result: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(result["authenticated"], true);
 
@@ -764,7 +888,9 @@ async fn handler_logout_success() {
     assert_eq!(logout_resp.status(), StatusCode::OK);
     assert!(logout_resp.headers().contains_key("set-cookie"));
 
-    let body = axum::body::to_bytes(logout_resp.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(logout_resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let result: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(result["message"], "Выход выполнен");
 
@@ -779,7 +905,9 @@ async fn handler_logout_success() {
         )
         .await
         .unwrap();
-    let body = axum::body::to_bytes(check_resp.into_body(), usize::MAX).await.unwrap();
+    let body = axum::body::to_bytes(check_resp.into_body(), usize::MAX)
+        .await
+        .unwrap();
     let result: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(result["authenticated"], false);
 }
@@ -896,6 +1024,100 @@ async fn handler_update_yougile_settings() {
     let settings: serde_json::Value = serde_json::from_slice(&body).unwrap();
     assert_eq!(settings["enabled"], true);
     assert_eq!(settings["api_url"], "https://test.yougile.com");
+}
+
+#[tokio::test]
+#[serial]
+async fn handler_update_yougile_settings_unauthorized() {
+    let app = create_test_app().await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/yougile/settings")
+                .method("PUT")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    r#"{"enabled":true,"api_url":"https://test.yougile.com"}"#,
+                ))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+#[serial]
+async fn handler_get_yougile_projects_unauthorized() {
+    let app = create_test_app().await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/yougile/projects")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+#[serial]
+async fn handler_get_yougile_boards_unauthorized() {
+    let app = create_test_app().await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/yougile/boards?project_id=test-project")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+#[serial]
+async fn handler_get_yougile_columns_unauthorized() {
+    let app = create_test_app().await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/yougile/columns?board_id=test-board")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+#[serial]
+async fn handler_get_yougile_users_unauthorized() {
+    let app = create_test_app().await;
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/yougile/users?project_id=test-project")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
 }
 
 // ── Full CRUD flow ──────────────────────────────────────────────────

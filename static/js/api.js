@@ -50,8 +50,13 @@ class Api {
     }
   }
 
-  async getSlots(from, to) {
-    return this._request(`/slots?from=${from}&to=${to}`);
+  async getSlots(from, to, search) {
+    const params = [];
+    if (from) params.push(`from=${from}`);
+    if (to) params.push(`to=${to}`);
+    if (search) params.push(`search=${encodeURIComponent(search)}`);
+    const queryString = params.length > 0 ? `?${params.join("&")}` : "";
+    return this._request(`/slots${queryString}`);
   }
 
   async createSlot(slotData) {
