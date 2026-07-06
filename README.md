@@ -102,8 +102,9 @@ sudo systemctl status migration-scheduler
 
 | Variable         | Default    | Description                  |
 |------------------|------------|------------------------------|
+| `HOST`           | `0.0.0.0`  | Address to bind the server to |
 | `PORT`           | `3030`     | Port to listen on            |
 | `ADMIN_PASSWORD` | `admin123` | Password for the admin panel |
 | `RUST_LOG`       | `info`     | Log level                    |
 
-> The application binds to `127.0.0.1` and is intended to run behind a reverse proxy (nginx, caddy, etc.).
+> The application binds to `0.0.0.0` by default. You can set `HOST=127.0.0.1` to bind it to localhost if running behind a reverse proxy (nginx, caddy, etc.).

@@ -6,8 +6,8 @@ use std::sync::Arc;
 use tokio::net::TcpListener;
 use tracing::info;
 
-pub async fn start_server(port: u16) -> Result<()> {
-    info!("Starting web server on port {}", port);
+pub async fn start_server(host: &str, port: u16) -> Result<()> {
+    info!("Starting web server on {}:{}", host, port);
 
     let scheduler = Arc::new(Scheduler::new().await?);
     let slot_count = scheduler.slot_count();
@@ -22,8 +22,8 @@ pub async fn start_server(port: u16) -> Result<()> {
 
     let app = api::routes(scheduler, yougile);
 
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", port)).await?;
-    info!("Server listening at http://127.0.0.1:{}", port);
+    let listener = TcpListener::bind(format!("{}:{}", host, port)).await?;
+    info!("Server listening at http://{}:{}", host, port);
 
     axum::serve(listener, app).await?;
 
